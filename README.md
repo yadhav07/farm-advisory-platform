@@ -39,9 +39,9 @@ cd farm_advisory
 python app.py
 ```
 
-The browser opens automatically at <http://127.0.0.1:5001>. Pages: dashboard,
-sensor diagnosis, leaf detection, weather-state vision, live weather, and the
-full advisory pipeline with downloadable reports.
+The browser opens automatically at <http://127.0.0.1:5001> — a chart-driven dashboard with
+live telemetry, disease-probability donuts, a yield gauge, sensor-profile radar and range
+charts, small-multiple telemetry history, weather forecasts, and the pipeline flowchart.
 
 ### 3. Or run the live CLI pipeline
 
@@ -94,8 +94,8 @@ Multidisciplinary_Project/
 │   ├── app.py                 # entry point: web UI (default) or --cli pipeline
 │   ├── dataset/, outputs/
 │   └── test.py
-├── web_ui/                    # Flask front end
-│   ├── app.py, model_service.py
+├── web_ui/                    # Flask dashboard
+│   ├── app.py, charts.py, model_service.py
 │   ├── templates/, static/
 │   └── README.md
 └── project_architecture.md    # full technical specification

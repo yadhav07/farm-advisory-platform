@@ -1,49 +1,70 @@
 {% extends "base.html" %}
-{% block title %}Weather-State Vision · Farm Advisory Platform{% endblock %}
+{% from "_flowchart.html" import pipeline %}
+
+{% block title %}Sky Vision · Farm Advisory Platform{% endblock %}
+{% block heading %}Weather-State Vision{% endblock %}
+{% block subheading %}Custom CNN classifying optical imagery into cloud, rain, shine or sunrise{% endblock %}
+
 {% block content %}
-<h1>🛰️ Weather-State Vision</h1>
-<p class="subtitle">Upload a sky or field photo. The CNN classifies the weather state into cloud, rain, shine or sunrise.</p>
+<div class="two-col">
+  <div class="card">
+    <h2>Upload a sky / field image</h2>
+    <p class="hint">The image passes through the trained weather CNN trained on 1,124 labelled photographs.</p>
+    <form method="post" enctype="multipart/form-data">
+      <div class="field">
+        <label for="image">Sky or field photograph</label>
+        <input type="file" id="image" name="image" accept="image/*" required>
+        <div class="hint">PNG, JPG, JPEG, WebP or BMP</div>
+      </div>
+      <div class="actions"><button type="submit">Classify weather state</button></div>
+    </form>
+  </div>
 
-{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
-
-<div class="card">
-  <form method="post" enctype="multipart/form-data">
-    <label class="field-label" for="image">Sky / field photo</label>
-    <input type="file" id="image" name="image" accept="image/*" required>
-    <div class="field-hint">PNG, JPG, JPEG, WebP or BMP</div>
-    <div style="margin-top: 14px;">
-      <button type="submit">Classify Weather State</button>
+  <div>
+    {% if result %}
+    <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+      <div class="kpi teal">
+        <div class="label">Weather state</div>
+        <div class="value" style="font-size:1.35rem;">{{ result.prediction }}</div>
+        <div class="sub">{{ (result.probability * 100)|round(1) }}% confidence</div>
+      </div>
+      <div class="kpi blue">
+        <div class="label">Classes</div>
+        <div class="value">{{ result.all_probabilities|length }}</div>
+        <div class="sub">cloud · rain · shine · sunrise</div>
+      </div>
     </div>
-  </form>
+
+    <div class="chart-card" style="margin-top:18px;">
+      <div class="head"><h3>State confidence</h3><span class="tag">satellite_weather_model.pth</span></div>
+      <div class="chart-frame">
+        <img src="{{ url_for('chart', kind='vision', id=result_id) }}" alt="Donut chart of weather state confidences">
+      </div>
+    </div>
+    {% else %}
+    <div class="card"><div class="empty">Upload a photograph to see the weather-state distribution.</div></div>
+    {% endif %}
+  </div>
 </div>
 
 {% if result %}
+<div class="section-title">All weather states</div>
 <div class="card">
-  <h2>Classification</h2>
-  <div class="result-hero">
-    <div>
-      <div class="big">{{ result.prediction }}</div>
-      <div style="color: var(--muted); font-size: 0.9rem;">
-        confidence {{ (result.probability * 100)|round(1) }}%
-      </div>
+  <div class="stat-list">
+    {% for item in result.topk %}
+    <div class="stat-row">
+      <div class="name">{{ item.class }}</div>
+      <div class="bar-track"><span style="width: {{ (item.probability * 100)|round(1) }}%"></span></div>
+      <div class="val">{{ (item.probability * 100)|round(1) }}%</div>
     </div>
+    {% endfor %}
   </div>
+</div>
 
-  <h3 style="margin-top: 22px;">Class probabilities</h3>
-  <table>
-    <thead><tr><th>Weather state</th><th>Probability</th></tr></thead>
-    <tbody>
-      {% for item in result.topk %}
-      <tr>
-        <td>{{ item.class }}</td>
-        <td>
-          <div class="prob-bar"><span style="width: {{ (item.probability * 100)|round(1) }}%"></span></div>
-          <small>{{ (item.probability * 100)|round(1) }}%</small>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="section-title">Inference path</div>
+<div class="flowchart-wrap">
+  {{ pipeline(active=3) }}
+  <div class="flow-legend"><span>The weather-state CNN branch of the pipeline produced this result.</span></div>
 </div>
 {% endif %}
 {% endblock %}

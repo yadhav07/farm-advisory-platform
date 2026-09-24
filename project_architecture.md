@@ -67,10 +67,11 @@ Multidisciplinary_Project/
     ├── app.py                                  # Entry point: web UI (default) or --cli pipeline
     └── test.py                                 # Self-test of the whole advisory chain
 │
-└── 🖥️ web_ui/                                  # Flask Web User Interface Subsystem
-    ├── templates/                              # Jinja2 templates (base + one per page)
-    ├── static/style.css                        # Dependency-free stylesheet
-    ├── app.py                                  # Flask routes (one per subsystem)
+└── 🖥️ web_ui/                                  # Flask Web Dashboard Subsystem
+    ├── templates/                              # Jinja2 templates (base + pages + SVG flowchart)
+    ├── static/style.css                        # Dashboard stylesheet
+    ├── app.py                                  # Flask routes + chart dispatch
+    ├── charts.py                               # Server-side matplotlib chart factory
     ├── model_service.py                        # Lazy-loaded, cached inference helpers
     ├── requirements.txt                        # Flask dependency pin
     ├── README.md                               # Run & usage notes
@@ -104,12 +105,14 @@ Multidisciplinary_Project/
 | **`farm_advisory`** | `delivery.py` | Python Script | Automated recommendation delivery. Renders markdown + JSON reports under `outputs/`, prints console summaries, and optionally pushes via SMTP email or a Telegram bot when configured. |
 | **`farm_advisory`** | `app.py` | Python Script | Unified entry point. `python app.py` launches the Flask web UI (browser opens automatically); `python app.py --cli` (or passing any pipeline option such as `--steps`, `--leaf`, `--offline`) runs the end-to-end live CLI pipeline - ingest telemetry, fetch weather, run the engine and deliver reports. |
 | **`farm_advisory`** | `test.py` | Python Script | Self-test of the advisory chain (healthy + stressed readings, live/cached weather, leaf image, file delivery). |
-| **`web_ui`** | `app.py` | Python Script | Flask application. Routes for the dashboard, sensor diagnosis, leaf/satellite image uploads, live weather and the full advisory pipeline; also serves downloadable advisory reports from `farm_advisory/outputs/`. |
-| **`web_ui`** | `model_service.py` | Python Script | Shared inference layer. Lazy-loads and caches every trained artifact (sensor bundle, EfficientNet-B0, weather CNN), resolves farm defaults and report delivery. All deep models run on CPU. |
-| **`web_ui`** | `templates/*.html` | Jinja2 Templates | `base.html` (layout + navigation) and per-page templates for dashboard, sensor, leaf, satellite, weather and advisory pages. |
-| **`web_ui`** | `static/style.css` | CSS | Dependency-free responsive stylesheet (cards, kpi tiles, probability bars, alerts, tables, badges). |
+| **`web_ui`** | `app.py` | Python Script | Flask application. Serves the dashboard pages, dispatches `/chart/<kind>` PNG rendering from a short-lived in-memory result store, and serves downloadable advisory reports from `farm_advisory/outputs/`. |
+| **`web_ui`** | `charts.py` | Python Script | Server-side chart factory (matplotlib `Agg`). Renders the disease donut, yield gauge, sensor radar, range bars, telemetry small-multiples, vision donut, weather forecast and priority-mix charts as PNG bytes, guarded by a lock for Flask's threaded server. |
+| **`web_ui`** | `model_service.py` | Python Script | Shared inference layer. Lazy-loads and caches every trained artifact (sensor bundle, EfficientNet-B0, weather CNN), reads the logged telemetry history, produces live simulated-node readings, and resolves farm defaults and report delivery. All deep models run on CPU. |
+| **`web_ui`** | `templates/_flowchart.html` | Jinja2 Macro | Hand-authored inline-SVG pipeline flowchart (inputs → preprocessing → models → fusion → output) that highlights the stage each page exercises. |
+| **`web_ui`** | `templates/*.html` | Jinja2 Templates | `base.html` (sidebar shell) plus per-page templates for overview, sensor, leaf, satellite, weather and advisory dashboards. |
+| **`web_ui`** | `static/style.css` | CSS | Dashboard stylesheet - sidebar navigation, KPI tiles, chart cards, priority-coded action cards, forms and tables. |
 | **`web_ui`** | `uploads/` | Runtime Data | Temporary storage for uploaded leaf/sky images; files and the folder are removed after inference to keep the tree tidy. |
-| **`web_ui`** | `README.md` | Documentation | How to install requirements, start the server and which page does what. |
+| **`web_ui`** | `README.md` | Documentation | How to install requirements, start the server, what each page shows and the chart catalogue. |
 
 ---
 
@@ -302,21 +305,38 @@ Key design points:
 
 ---
 
-## 6. Web User Interface (`./web_ui/`)
+## 6. Web Dashboard (`./web_ui/`)
 
-A dependency-free Flask front end that makes every trained subsystem usable from the browser. Models are loaded once and cached (running on CPU), so the interface stays responsive after the first request:
+A chart-driven Flask dashboard over every trained subsystem. Models are loaded once and cached (running on CPU), and every visual is rendered **server-side** with matplotlib, so there is no JavaScript charting library and no CDN:
 
 | Route | Page | Function |
 | :--- | :--- | :--- |
-| `/` | Dashboard | Overview of the available tools. |
-| `/sensor` | Sensor | 8-field telemetry form -> disease diagnosis + per-class probabilities + Yield_Rate forecast (Random Forest). |
-| `/leaf` | Leaf | Image upload -> EfficientNet-B0 leaf disease diagnosis with top-k confidence. |
-| `/satellite` | Satellite | Image upload -> weather-state CNN classification (cloud / rain / shine / sunrise). |
-| `/weather` | Weather | Latitude/longitude form -> live Open-Meteo conditions + 3-day forecast. |
-| `/advisory` | Advisory | Full pipeline - sensor + optional leaf/sky photos + optional live weather -> prioritized recommendations, plus downloadable markdown/JSON reports served from `farm_advisory/outputs/`. |
+| `/` | Overview | Live simulated-node telemetry through the Random Forest heads, KPI tiles, model charts, logged-telemetry time series and the pipeline flowchart. |
+| `/sensor` | Sensor analytics | 8-field telemetry (live by default, custom on submit) -> disease donut, yield gauge, profile radar and per-feature range bars. |
+| `/leaf` | Leaf vision | Image upload -> EfficientNet-B0 diagnosis with a confidence donut and top-k bars. |
+| `/satellite` | Sky vision | Image upload -> weather-state CNN classification with a confidence donut. |
+| `/weather` | Weather | Live conditions as KPI tiles plus a 3-day forecast chart (temperature range + precipitation probability). |
+| `/advisory` | Advisory | Full pipeline -> priority-mix donut, disease donut, ranked action cards and downloadable markdown/JSON reports from `farm_advisory/outputs/`. |
+| `/chart/<kind>` | Chart API | Renders any dashboard chart as PNG from a stored result payload. |
 
-Design points:
+### 6.1 Chart Catalogue
+
+| Chart kind | Visual |
+| :--- | :--- |
+| `disease` | donut of disease class probabilities |
+| `yield` | semicircular gauge for the Yield_Rate forecast |
+| `radar` | sensor profile against each feature's ideal range |
+| `bars` | reading position inside each admissible range (out-of-range in red) |
+| `telemetry` | small-multiple time series of the logged readings (one scale per panel) |
+| `vision` | donut of leaf / weather-state classifier confidences |
+| `forecast` | 3-day temperature-range bars + precipitation-probability line |
+| `priority` | donut of advisory actions grouped by priority |
+
+### 6.2 Design Points
 - **Single inference layer** (`model_service.py`) - every model artifact (sensor `rf_model.joblib`, leaf checkpoint, satellite checkpoint) is loaded lazily into a module-level singleton and reused across requests.
+- **Server-side charting** (`charts.py`) - matplotlib with the `Agg` backend renders PNG bytes, guarded by a lock because Flask serves requests on multiple threads.
+- **In-flight result store** - a page runs inference once, stores the chart payload under a short id, and each `<img>` fetches `/chart/<kind>?id=...`, so charts never re-run a model.
+- **Inline SVG flowcharts** (`_flowchart.html`) - the five-stage data-flow diagram is hand-authored SVG, highlighting the stage a page exercises; no diagram library needed.
 - **Clean runtime behaviour** - uploaded images are saved to `uploads/` with a unique name, processed, then removed so the repository stays tidy.
 - **Report downloads** are served through a validated route (`secure_filename`) with no filesystem traversal risk.
 - The Flask development server is intended for local/demo use; production deployments should run it behind a WSGI server such as `waitress` or `gunicorn`.

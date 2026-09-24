@@ -7,24 +7,56 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="{{ url_for('index') }}">🌾 Farm Advisory Platform</a>
-    <nav>
-      <a href="{{ url_for('index') }}">Dashboard</a>
-      <a href="{{ url_for('sensor') }}">Sensor</a>
-      <a href="{{ url_for('leaf') }}">Leaf</a>
-      <a href="{{ url_for('satellite') }}">Satellite</a>
-      <a href="{{ url_for('weather') }}">Weather</a>
-      <a href="{{ url_for('advisory') }}" class="nav-cta">Full Advisory</a>
-    </nav>
-  </header>
+<div class="app">
 
-  <main class="container">
-    {% block content %}{% endblock %}
-  </main>
+  <aside class="sidebar">
+    <div class="logo">🌾<span>Farm Advisory<br>Platform</span></div>
 
-  <footer class="footer">
-    Multi-disciplinary Agronomy ML · sensor + leaf + satellite vision + live weather + advisory delivery
-  </footer>
+    <div class="group-label">Monitor</div>
+    <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}">
+      <span class="ico">📊</span> Overview
+    </a>
+    <a href="{{ url_for('weather') }}" class="{{ 'active' if request.endpoint == 'weather' }}">
+      <span class="ico">⛅</span> Live Weather
+    </a>
+
+    <div class="group-label">Models</div>
+    <a href="{{ url_for('sensor') }}" class="{{ 'active' if request.endpoint == 'sensor' }}">
+      <span class="ico">📡</span> Sensor Analytics
+    </a>
+    <a href="{{ url_for('leaf') }}" class="{{ 'active' if request.endpoint == 'leaf' }}">
+      <span class="ico">🍃</span> Leaf Vision
+    </a>
+    <a href="{{ url_for('satellite') }}" class="{{ 'active' if request.endpoint == 'satellite' }}">
+      <span class="ico">🛰️</span> Sky Vision
+    </a>
+
+    <div class="group-label">Decision</div>
+    <a href="{{ url_for('advisory') }}" class="{{ 'active' if request.endpoint == 'advisory' }}">
+      <span class="ico">🧠</span> Advisory Engine
+    </a>
+
+    <div class="foot">
+      Random Forest · EfficientNet-B0 · Weather CNN<br>
+      Flask dashboard
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div>
+        <h1>{% block heading %}Farm Advisory Platform{% endblock %}</h1>
+        <p class="sub">{% block subheading %}{% endblock %}</p>
+      </div>
+      <div>{% block topbar_right %}{% endblock %}</div>
+    </header>
+
+    <div class="content">
+      {% if error %}<div class="alert error"><span>⚠️</span><span>{{ error }}</span></div>{% endif %}
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+
+</div>
 </body>
 </html>

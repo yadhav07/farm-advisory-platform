@@ -1,63 +1,124 @@
 {% extends "base.html" %}
-{% block title %}Sensor Diagnosis · Farm Advisory Platform{% endblock %}
+{% from "_flowchart.html" import pipeline %}
+
+{% block title %}Sensor Analytics · Farm Advisory Platform{% endblock %}
+{% block heading %}Sensor Analytics{% endblock %}
+{% block subheading %}Random Forest disease classification and Yield_Rate regression on 8-field telemetry{% endblock %}
+
+{% block topbar_right %}
+  {% if is_live %}<span class="live-pill"><span class="dot"></span>live reading</span>
+  {% else %}<span class="badge info">custom reading</span>{% endif %}
+{% endblock %}
+
 {% block content %}
-<h1>📡 Sensor Diagnosis &amp; Yield Forecast</h1>
-<p class="subtitle">Enter the eight field readings from a soil/air sensor node. A trained Random Forest classifies disease state and a regressor forecasts Yield_Rate.</p>
 
-{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+<div class="two-col">
+  <!-- control panel -->
+  <div class="card">
+    <h2>Control panel</h2>
+    <p class="hint">The dashboard shows a live node reading by default. Enter your own values to re-run the model.</p>
 
-<div class="card">
-  <form method="post">
-    <div class="field-row">
-      {% for f in fields %}
-      <div>
-        <label class="field-label" for="{{ f.name }}">{{ f.label }} ({{ f.unit }})</label>
-        <input type="number" id="{{ f.name }}" name="{{ f.name }}"
-               step="{{ f.step }}" min="{{ f.low }}" max="{{ f.high }}"
-               value="{{ values.get(f.name, f.default) }}" required>
-        <div class="field-hint">ideal {{ f.low }}–{{ f.high }}</div>
+    <form method="post">
+      <div class="form-grid">
+        {% for f in fields %}
+        <div class="field">
+          <label for="{{ f.name }}">{{ f.label }} <span class="unit">({{ f.unit }})</span></label>
+          <input type="number" id="{{ f.name }}" name="{{ f.name }}"
+                 step="{{ f.step }}" min="{{ f.low }}" max="{{ f.high }}"
+                 value="{{ values.get(f.name, f.default) }}" required>
+          <div class="hint">ideal {{ f.low }}–{{ f.high }}</div>
+        </div>
+        {% endfor %}
       </div>
-      {% endfor %}
+      <div class="actions">
+        <button type="submit">Run model</button>
+        <a class="btn secondary small" href="{{ url_for('sensor') }}">Reset to live</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- model output -->
+  <div>
+    {% if result %}
+    <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));">
+      <div class="kpi {{ '' if result.prediction == 'Healthy' else 'red' }}">
+        <div class="label">Crop state</div>
+        <div class="value">{{ result.prediction }}</div>
+        <div class="sub">{{ (result.probabilities[result.prediction] * 100)|round(1) }}% confidence</div>
+      </div>
+      <div class="kpi blue">
+        <div class="label">Yield_Rate</div>
+        <div class="value">{{ result.yield_forecast }}</div>
+        <div class="sub">regressor output</div>
+      </div>
+      <div class="kpi {{ 'amber' if risk[1] >= 0.25 else '' }}">
+        <div class="label">Top risk</div>
+        <div class="value">{{ (risk[1] * 100)|round(1) }}%</div>
+        <div class="sub">{{ risk[0].replace('_', ' ') if risk[0] else '—' }}</div>
+      </div>
     </div>
-    <div style="margin-top: 18px;">
-      <button type="submit">Diagnose &amp; Forecast</button>
+
+    <div class="chart-grid" style="margin-top:18px;">
+      <div class="chart-card">
+        <div class="head"><h3>Disease probabilities</h3><span class="tag">donut</span></div>
+        <div class="chart-frame">
+          <img src="{{ url_for('chart', kind='disease', id=result_id) }}" alt="Disease class probability donut chart">
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="head"><h3>Yield forecast</h3><span class="tag">gauge</span></div>
+        <div class="chart-frame">
+          <img src="{{ url_for('chart', kind='yield', id=result_id) }}" alt="Yield rate gauge">
+        </div>
+      </div>
     </div>
-  </form>
+    {% else %}
+    <div class="card"><div class="empty">No model output yet.</div></div>
+    {% endif %}
+  </div>
 </div>
 
 {% if result %}
-<div class="card">
-  <h2>Result</h2>
-  <div class="result-hero">
-    <div>
-      <div class="big {{ '' if result.prediction == 'Healthy' else 'unhealthy' }}">
-        {{ result.prediction }}
-      </div>
-      <div style="color: var(--muted); font-size: 0.9rem;">predicted crop state</div>
+<div class="section-title">Reading against agronomic ranges</div>
+<div class="chart-grid">
+  <div class="chart-card">
+    <div class="head"><h3>Profile vs ideal</h3><span class="tag">radar</span></div>
+    <div class="chart-frame">
+      <img src="{{ url_for('chart', kind='radar', id=result_id) }}" alt="Radar chart of sensor profile">
     </div>
-    {% if result.yield_forecast is not none %}
-    <div class="kpi">
-      <div class="value">{{ result.yield_forecast }}</div>
-      <div class="label">Yield_Rate forecast</div>
-    </div>
-    {% endif %}
   </div>
+  <div class="chart-card">
+    <div class="head"><h3>Position in range</h3><span class="tag">bars</span></div>
+    <div class="chart-frame">
+      <img src="{{ url_for('chart', kind='bars', id=result_id) }}" alt="Bar chart of each reading within its range">
+    </div>
+  </div>
+</div>
 
-  <h3 style="margin-top: 22px;">Class probabilities</h3>
-  <table>
-    <thead><tr><th>Class</th><th>Probability</th></tr></thead>
-    <tbody>
-      {% for cls, prob in result.probabilities.items() %}
-      <tr>
-        <td>{{ cls }}</td>
-        <td>
-          <div class="prob-bar"><span style="width: {{ (prob * 100)|round(1) }}%"></span></div>
-          <small>{{ (prob * 100)|round(1) }}%</small>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="section-title">Raw readings</div>
+<div class="card">
+  <div class="stat-list">
+    {% for f in fields %}
+      {% set v = values.get(f.name, f.default) %}
+      {% set pos = (((v - f.low) / (f.high - f.low)) * 100) %}
+      {% set clamped = pos if pos >= 0 and pos <= 100 else (0 if pos < 0 else 100) %}
+      <div class="stat-row">
+        <div class="name">{{ f.label }} <span class="unit">({{ f.unit }})</span></div>
+        <div class="bar-track">
+          <span class="{{ '' if f.low <= v <= f.high else 'bad' }}" style="width: {{ clamped|round(1) }}%"></span>
+        </div>
+        <div class="val">{{ '%.1f'|format(v) }}</div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="section-title">How this reading is processed</div>
+<div class="flowchart-wrap">
+  {{ pipeline(active=3) }}
+  <div class="flow-legend">
+    <span>Highlighted stage: the two Random Forest heads applied to this reading.</span>
+  </div>
 </div>
 {% endif %}
 {% endblock %}

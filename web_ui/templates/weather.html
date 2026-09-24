@@ -1,68 +1,84 @@
 {% extends "base.html" %}
 {% block title %}Live Weather · Farm Advisory Platform{% endblock %}
+{% block heading %}Live Weather{% endblock %}
+{% block subheading %}Current conditions and 3-day forecast from the Open-Meteo API{% endblock %}
+
+{% block topbar_right %}<span class="live-pill"><span class="dot"></span>auto-refresh on load</span>{% endblock %}
+
 {% block content %}
-<h1>⛅ Live Weather Feed</h1>
-<p class="subtitle">Current conditions and a 3-day forecast from Open-Meteo for any farm location (decimal lat / lon).</p>
-
-{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
-
-<div class="card">
+<div class="card" style="margin-bottom:20px;">
+  <h2>Location</h2>
+  <p class="hint">Decimal coordinates for any farm. Defaults to the configured farm location.</p>
   <form method="post">
-    <div class="field-row">
-      <div>
-        <label class="field-label" for="latitude">Latitude</label>
-        <input type="number" id="latitude" name="latitude" step="0.0001" min="-90" max="90"
-               value="{{ latitude }}">
+    <div class="form-grid">
+      <div class="field">
+        <label for="latitude">Latitude</label>
+        <input type="number" id="latitude" name="latitude" step="0.0001" min="-90" max="90" value="{{ latitude }}">
       </div>
-      <div>
-        <label class="field-label" for="longitude">Longitude</label>
-        <input type="number" id="longitude" name="longitude" step="0.0001" min="-180" max="180"
-               value="{{ longitude }}">
+      <div class="field">
+        <label for="longitude">Longitude</label>
+        <input type="number" id="longitude" name="longitude" step="0.0001" min="-180" max="180" value="{{ longitude }}">
       </div>
     </div>
-    <div style="margin-top: 14px;">
-      <button type="submit">Fetch Live Weather</button>
-    </div>
+    <div class="actions"><button type="submit">Fetch live weather</button></div>
   </form>
 </div>
 
 {% if snapshot %}
-<div class="card">
-  <h2>Current Conditions <span style="color: var(--muted); font-weight: 400; font-size: 0.9rem;">({{ snapshot.latitude }}, {{ snapshot.longitude }})</span></h2>
-  <div class="kpi-row">
-    <div class="kpi"><div class="value">{{ snapshot.weather_label }}</div><div class="label">condition</div></div>
-    <div class="kpi"><div class="value">{{ snapshot.temperature }}°C</div><div class="label">temperature</div></div>
-    <div class="kpi"><div class="value">{{ snapshot.humidity }}%</div><div class="label">relative humidity</div></div>
-    <div class="kpi"><div class="value">{{ snapshot.precipitation_mm }} mm</div><div class="label">precipitation</div></div>
-    <div class="kpi"><div class="value">{{ snapshot.wind_speed_kmh }} km/h</div><div class="label">wind speed</div></div>
+<div class="kpi-grid">
+  <div class="kpi teal">
+    <div class="label">Condition</div>
+    <div class="value" style="font-size:1.25rem;">{{ snapshot.weather_label }}</div>
+    <div class="sub">source: {{ snapshot.source }}</div>
   </div>
-  <p style="color: var(--muted); font-size: 0.86rem;">
-    observed {{ snapshot.observed_at }} · source: {{ snapshot.source }}
-  </p>
+  <div class="kpi">
+    <div class="label">Temperature</div>
+    <div class="value">{{ snapshot.temperature }}°C</div>
+    <div class="sub">observed {{ snapshot.observed_at }}</div>
+  </div>
+  <div class="kpi blue">
+    <div class="label">Humidity</div>
+    <div class="value">{{ snapshot.humidity }}%</div>
+    <div class="sub">relative humidity</div>
+  </div>
+  <div class="kpi amber">
+    <div class="label">Precipitation</div>
+    <div class="value">{{ snapshot.precipitation_mm }} mm</div>
+    <div class="sub">current rainfall</div>
+  </div>
+  <div class="kpi purple">
+    <div class="label">Wind</div>
+    <div class="value">{{ snapshot.wind_speed_kmh }}</div>
+    <div class="sub">km/h</div>
+  </div>
 </div>
 
-{% if forecast_rows %}
+<div class="section-title">Forecast</div>
+<div class="chart-card">
+  <div class="head"><h3>3-day outlook</h3><span class="tag">temperature range + precipitation probability</span></div>
+  <div class="chart-frame">
+    <img src="{{ url_for('chart', kind='forecast', id=result_id) }}" alt="Weather forecast chart">
+  </div>
+</div>
+
+<div class="section-title">Daily detail</div>
 <div class="card">
-  <h2>3-Day Forecast</h2>
   <table>
-    <thead>
-      <tr><th>Date</th><th>Min</th><th>Max</th><th>Precip. probability</th><th>Precip. sum</th></tr>
-    </thead>
+    <thead><tr><th>Date</th><th class="num">Min</th><th class="num">Max</th><th class="num">Precip. probability</th><th class="num">Precip. sum</th></tr></thead>
     <tbody>
       {% for row in forecast_rows %}
       <tr>
         <td>{{ row.date }}</td>
-        <td>{{ row.t_min }}°C</td>
-        <td>{{ row.t_max }}°C</td>
-        <td>{{ row.precip_prob }}%</td>
-        <td>{{ row.precip_sum }} mm</td>
+        <td class="num">{{ row.t_min }}°C</td>
+        <td class="num">{{ row.t_max }}°C</td>
+        <td class="num">{{ row.precip_prob }}%</td>
+        <td class="num">{{ row.precip_sum }} mm</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
-{% endif %}
-{% elif not error %}
-<div class="card"><p style="color: var(--muted); margin: 0;">No snapshot available yet — submit the form to fetch live weather.</p></div>
+{% else %}
+<div class="card"><div class="empty">No weather snapshot available.</div></div>
 {% endif %}
 {% endblock %}

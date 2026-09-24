@@ -1,38 +1,127 @@
 {% extends "base.html" %}
-{% block title %}Dashboard · Farm Advisory Platform{% endblock %}
+{% from "_flowchart.html" import pipeline %}
+
+{% block title %}Overview · Farm Advisory Platform{% endblock %}
+{% block heading %}Farm Overview{% endblock %}
+{% block subheading %}Live telemetry streamed from the simulated IoT node, run through the trained models{% endblock %}
+
+{% block topbar_right %}
+  {% if reading %}<span class="live-pill"><span class="dot"></span>live · node {{ reading.node_id }}</span>{% endif %}
+{% endblock %}
+
 {% block content %}
-<h1>🌾 Farm Advisory Platform</h1>
-<p class="subtitle">A multi-disciplinary agronomy ML system — sensor telemetry, leaf and satellite vision, live weather, and automated farm advisories.</p>
 
-<div class="grid">
-  <a class="tile" href="{{ url_for('sensor') }}">
-    <div class="emoji">📡</div>
-    <h3>Sensor Diagnosis &amp; Yield</h3>
-    <p>Random Forest disease classifier + yield regressor from an 8-feature soil/air reading.</p>
+{% if result %}
+<div class="kpi-grid">
+  <div class="kpi {{ '' if result.prediction == 'Healthy' else 'red' }}">
+    <div class="label">Crop state</div>
+    <div class="value">{{ result.prediction }}</div>
+    <div class="sub">Random Forest · {{ (result.probabilities[result.prediction] * 100)|round(1) }}% confidence</div>
+  </div>
+
+  <div class="kpi blue">
+    <div class="label">Yield_Rate forecast</div>
+    <div class="value">{{ result.yield_forecast }}</div>
+    <div class="sub">Random Forest regressor · 10–100</div>
+  </div>
+
+  <div class="kpi {{ 'amber' if top_risk[1] >= 0.25 else '' }}">
+    <div class="label">Top disease risk</div>
+    <div class="value">{{ (top_risk[1] * 100)|round(1) }}%</div>
+    <div class="sub">{{ top_risk[0].replace('_', ' ') if top_risk[0] else '—' }}</div>
+  </div>
+
+  {% if weather %}
+  <div class="kpi teal">
+    <div class="label">Weather now</div>
+    <div class="value">{{ weather.temperature }}°C</div>
+    <div class="sub">{{ weather.weather_label }} · {{ weather.humidity }}% RH · wind {{ weather.wind_speed_kmh }} km/h</div>
+  </div>
+  {% endif %}
+
+  <div class="kpi purple">
+    <div class="label">Telemetry</div>
+    <div class="value">{{ reading.timestamp[11:16] }}</div>
+    <div class="sub">{{ reading.crop }} · reading captured now</div>
+  </div>
+</div>
+
+<div class="section-title">Model output</div>
+<div class="chart-grid">
+  <div class="chart-card">
+    <div class="head"><h3>Disease probability distribution</h3><span class="tag">rf_model.joblib</span></div>
+    <div class="chart-frame">
+      <img src="{{ url_for('chart', kind='disease', id=result_id) }}" alt="Donut chart of disease class probabilities">
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="head"><h3>Yield_Rate forecast</h3><span class="tag">regressor</span></div>
+    <div class="chart-frame">
+      <img src="{{ url_for('chart', kind='yield', id=result_id) }}" alt="Gauge showing the predicted yield rate">
+    </div>
+  </div>
+</div>
+
+<div class="section-title">Sensor telemetry &amp; environment</div>
+<div class="chart-grid">
+  <div class="chart-card">
+    <div class="head"><h3>Sensor profile vs ideal range</h3><span class="tag">8 features</span></div>
+    <div class="chart-frame">
+      <img src="{{ url_for('chart', kind='radar', id=result_id) }}" alt="Radar chart comparing the reading to the ideal range">
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="head"><h3>3-day weather forecast</h3><span class="tag">Open-Meteo</span></div>
+    <div class="chart-frame">
+      <img src="{{ url_for('chart', kind='forecast', id=result_id) }}" alt="Three day weather forecast">
+    </div>
+  </div>
+</div>
+
+<div class="section-title">Logged telemetry history</div>
+<div class="chart-card">
+  <div class="head"><h3>Recent sensor readings over time</h3><span class="tag">farm_advisory/dataset/sensor_log.csv</span></div>
+  <div class="chart-frame">
+    <img src="{{ url_for('chart', kind='telemetry') }}" alt="Time series of logged temperature, humidity, moisture, nutrients, pH and light">
+  </div>
+</div>
+
+<div class="section-title">System pipeline</div>
+<div class="flowchart-wrap">
+  {{ pipeline() }}
+  <div class="flow-legend">
+    <span><i style="background:#2e7d32"></i> inputs</span>
+    <span><i style="background:#00838f"></i> preprocessing</span>
+    <span><i style="background:#1565c0"></i> models</span>
+    <span><i style="background:#5e35b1"></i> fusion</span>
+    <span><i style="background:#c62828"></i> output</span>
+  </div>
+</div>
+{% endif %}
+
+<div class="section-title">Tools</div>
+<div class="tool-grid">
+  <a class="tool" href="{{ url_for('sensor') }}">
+    <div class="ico">📡</div>
+    <h3>Sensor Analytics</h3>
+    <p>Enter a custom reading and inspect disease probabilities, yield and range charts.</p>
   </a>
-
-  <a class="tile" href="{{ url_for('leaf') }}">
-    <div class="emoji">🍃</div>
-    <h3>Leaf Disease Detection</h3>
-    <p>EfficientNet-B0 CNN — upload a leaf photo and get an instant disease diagnosis.</p>
+  <a class="tool" href="{{ url_for('leaf') }}">
+    <div class="ico">🍃</div>
+    <h3>Leaf Vision</h3>
+    <p>Upload a leaf photo for EfficientNet-B0 diagnosis with a confidence donut.</p>
   </a>
-
-  <a class="tile" href="{{ url_for('satellite') }}">
-    <div class="emoji">🛰️</div>
-    <h3>Weather-State Vision</h3>
-    <p>Image CNN that classifies the sky/field state: cloud, rain, shine or sunrise.</p>
+  <a class="tool" href="{{ url_for('satellite') }}">
+    <div class="ico">🛰️</div>
+    <h3>Sky Vision</h3>
+    <p>Classify cloud / rain / shine / sunrise from a field photograph.</p>
   </a>
-
-  <a class="tile" href="{{ url_for('weather') }}">
-    <div class="emoji">⛅</div>
-    <h3>Live Weather Feed</h3>
-    <p>Current conditions + 3-day forecast from Open-Meteo, cached and offline-safe.</p>
-  </a>
-
-  <a class="tile" href="{{ url_for('advisory') }}">
-    <div class="emoji">🧠</div>
-    <h3>Full Farm Advisory</h3>
-    <p>Fuse sensor + optional photos + live weather into prioritized, actionable recommendations.</p>
+  <a class="tool" href="{{ url_for('advisory') }}">
+    <div class="ico">🧠</div>
+    <h3>Advisory Engine</h3>
+    <p>Fuse every signal into ranked actions and download the full report.</p>
   </a>
 </div>
 {% endblock %}

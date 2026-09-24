@@ -1,0 +1,50 @@
+{#- Reusable SVG pipeline flowchart. Pass the 1-based stage number to highlight. -#}
+{% macro pipeline(active=None, compact=False) %}
+{% set stages = [
+  {'title': 'IoT Inputs', 'sub': 'telemetry · weather · imagery',
+   'items': ['Sensor node (8 features)', 'Open-Meteo weather', 'Leaf photograph', 'Sky / field photograph'],
+   'color': '#2e7d32', 'light': '#e8f5e9'},
+  {'title': 'Preprocessing', 'sub': 'validate · scale · normalise',
+   'items': ['Range validation', 'StandardScaler', 'Resize to 224px', 'ImageNet normalisation'],
+   'color': '#00838f', 'light': '#e0f2f1'},
+  {'title': 'Trained Models', 'sub': 'inference on CPU',
+   'items': ['Random Forest classifier', 'Yield_Rate regressor', 'EfficientNet-B0', 'Weather-state CNN'],
+   'color': '#1565c0', 'light': '#e3f2fd'},
+  {'title': 'Fusion Engine', 'sub': 'probabilities + agronomic rules',
+   'items': ['Class probabilities', 'Yield forecast', 'Weather advisories', 'Priority ranking'],
+   'color': '#5e35b1', 'light': '#ede7f6'},
+  {'title': 'Advisory Output', 'sub': 'ranked actions + delivery',
+   'items': ['Irrigation & drainage', 'Nutrition & pH', 'Disease control', 'Markdown / JSON report'],
+   'color': '#c62828', 'light': '#ffebee'}
+] %}
+<svg class="flowchart" viewBox="0 0 1040 268" preserveAspectRatio="xMidYMid meet" role="img"
+     aria-label="Data flow from IoT inputs through preprocessing, trained models, fusion engine and advisory output">
+  {% for s in stages %}
+    {% set x = 20 + loop.index0 * 205 %}
+    {% set is_active = active == loop.index %}
+    {# stage container #}
+    <rect x="{{ x }}" y="34" width="180" height="200" rx="14"
+          fill="{{ s.light }}" stroke="{{ s.color if is_active else 'none' }}"
+          stroke-width="{{ 3 if is_active else 0 }}"/>
+    <path d="M {{ x + 14 }} 34 h 152 a 14 14 0 0 1 14 14 v 0 h -180 v 0 a 14 14 0 0 1 14 -14 z"
+          fill="{{ s.color }}" opacity="{{ 1 if is_active else 0.85 }}"/>
+    <text x="{{ x + 90 }}" y="67" text-anchor="middle" font-size="12.6" font-weight="700"
+          fill="{{ s.color }}">{{ s.title }}</text>
+    <text x="{{ x + 90 }}" y="83" text-anchor="middle" font-size="8.6"
+          fill="#607d8b">{{ s.sub }}</text>
+    {% for item in s['items'] %}
+      {% set cy = 94 + loop.index0 * 34 %}
+      <rect x="{{ x + 12 }}" y="{{ cy }}" width="156" height="28" rx="8"
+            fill="#ffffff" stroke="#dfe7e2" stroke-width="1"/>
+      <text x="{{ x + 90 }}" y="{{ cy + 18 }}" text-anchor="middle" font-size="8.9"
+            fill="#1f2d33">{{ item }}</text>
+    {% endfor %}
+    {# connector arrow #}
+    {% if not loop.last %}
+      <line x1="{{ x + 184 }}" y1="134" x2="{{ x + 198 }}" y2="134"
+            stroke="#90a4ae" stroke-width="2"/>
+      <polygon points="{{ x + 198 }},134 {{ x + 205 }},129.5 {{ x + 205 }},138.5" fill="#90a4ae"/>
+    {% endif %}
+  {% endfor %}
+</svg>
+{% endmacro %}

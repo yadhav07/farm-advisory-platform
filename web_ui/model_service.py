@@ -252,6 +252,45 @@ def get_report_dir():
     return config.REPORT_DIR
 
 
+def model_status():
+    """Report which trained artifacts are present (used by tests/CLI)."""
+    return {
+        'sensor_model': os.path.exists(SENSOR_MODEL_PATH),
+        'leaf_model': os.path.exists(LEAF_MODEL_PATH),
+        'satellite_model': os.path.exists(SATELLITE_MODEL_PATH),
+    }
+
+
+def read_telemetry(limit=40):
+    """Most recent rows from the farm sensor log, oldest first."""
+    _ensure_on_path(os.path.join(PROJECT_ROOT, 'farm_advisory'))
+    import csv
+    from config import SENSOR_LOG_PATH
+
+    if not os.path.exists(SENSOR_LOG_PATH):
+        return []
+
+    rows = []
+    with open(SENSOR_LOG_PATH, 'r', encoding='utf-8', newline='') as handle:
+        for row in csv.DictReader(handle):
+            try:
+                rows.append({f: float(row.get(f)) for f in SENSOR_FEATURES})
+            except (TypeError, ValueError):
+                continue
+    return rows[-limit:]
+
+
+def live_reading(stress_profile='normal'):
+    """A fresh simulated IoT reading; stable within a 30-second window."""
+    import time as _time
+    _ensure_on_path(os.path.join(PROJECT_ROOT, 'farm_advisory'))
+    from iot_ingestion import SimulatedSensorNode
+
+    node = SimulatedSensorNode('WEB-LIVE', seed=int(_time.time() // 30),
+                               stress_profile=stress_profile)
+    return node.read()
+
+
 def get_farm_defaults():
     _ensure_on_path(os.path.join(PROJECT_ROOT, 'farm_advisory'))
     import config
