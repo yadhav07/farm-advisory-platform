@@ -1,70 +1,119 @@
 {% extends "base.html" %}
-{% from "_flowchart.html" import pipeline %}
+{% from "_charts.html" import donut, flow %}
 
-{% block title %}Sky Vision · Farm Advisory Platform{% endblock %}
-{% block heading %}Weather-State Vision{% endblock %}
-{% block subheading %}Custom CNN classifying optical imagery into cloud, rain, shine or sunrise{% endblock %}
+{% block title %}Sky vision · FarmIQ{% endblock %}
+{% block crumb %}Sky vision{% endblock %}
 
 {% block content %}
-<div class="two-col">
-  <div class="card">
-    <h2>Upload a sky / field image</h2>
-    <p class="hint">The image passes through the trained weather CNN trained on 1,124 labelled photographs.</p>
-    <form method="post" enctype="multipart/form-data">
-      <div class="field">
-        <label for="image">Sky or field photograph</label>
-        <input type="file" id="image" name="image" accept="image/*" required>
-        <div class="hint">PNG, JPG, JPEG, WebP or BMP</div>
-      </div>
-      <div class="actions"><button type="submit">Classify weather state</button></div>
-    </form>
+<section class="view">
+
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">SKY VISION</p>
+      <h1>Read the weather from a photograph.</h1>
+      <p>
+        A custom CNN trained on 1,124 labelled photographs classifies the scene as
+        cloud, rain, shine or sunrise.
+      </p>
+    </div>
+    <span class="scope-badge power"><i class="fa-solid fa-cloud-sun"></i> Weather CNN</span>
   </div>
 
-  <div>
-    {% if result %}
-    <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
-      <div class="kpi teal">
-        <div class="label">Weather state</div>
-        <div class="value" style="font-size:1.35rem;">{{ result.prediction }}</div>
-        <div class="sub">{{ (result.probability * 100)|round(1) }}% confidence</div>
+  <div class="simulator-grid">
+    <article class="panel-card controls-card">
+      <div class="panel-header controls-header">
+        <div><span class="panel-kicker">UPLOAD</span><h2>Sky or field photograph</h2></div>
       </div>
-      <div class="kpi blue">
-        <div class="label">Classes</div>
-        <div class="value">{{ result.all_probabilities|length }}</div>
-        <div class="sub">cloud · rain · shine · sunrise</div>
+      <div class="panel-body">
+        <form method="post" enctype="multipart/form-data">
+          <div class="field">
+            <label for="image">Choose an image</label>
+            <input type="file" id="image" name="image" accept="image/*" required>
+            <span class="hint">PNG, JPG, JPEG, WebP or BMP</span>
+          </div>
+          <div class="actions">
+            <button type="submit" class="primary-button power-button"><i class="fa-solid fa-magnifying-glass"></i> Classify weather state</button>
+          </div>
+        </form>
       </div>
-    </div>
+    </article>
 
-    <div class="chart-card" style="margin-top:18px;">
-      <div class="head"><h3>State confidence</h3><span class="tag">satellite_weather_model.pth</span></div>
-      <div class="chart-frame">
-        <img src="{{ url_for('chart', kind='vision', id=result_id) }}" alt="Donut chart of weather state confidences">
+    <aside class="panel-card result-card blue">
+      <div class="result-topline">
+        <span class="panel-kicker">PREDICTED OUTPUT</span>
+        {% if result %}<span class="live-tag"><i></i> Live</span>{% endif %}
       </div>
-    </div>
-    {% else %}
-    <div class="card"><div class="empty">Upload a photograph to see the weather-state distribution.</div></div>
-    {% endif %}
+      {% if result %}
+        <div class="result-primary">
+          <span>Weather state</span>
+          <strong style="font-size:clamp(28px,3vw,38px);">{{ result.prediction }}</strong>
+        </div>
+        <div class="benchmark-block">
+          <div class="benchmark-label"><span>Confidence</span><strong>{{ pct(result.probability) }}</strong></div>
+          <div class="progress-track blue"><span style="width: {{ (result.probability * 100)|round(1) }}%"></span></div>
+          <div class="benchmark-scale"><span>0%</span><span>Weather CNN</span><span>100%</span></div>
+        </div>
+        <div class="result-detail-grid">
+          <div><span>Classes</span><strong>{{ result.all_probabilities|length }}</strong></div>
+          <div><span>Top-2 margin</span><strong>{{ pct(result.topk[0].probability - result.topk[1].probability) }}</strong></div>
+        </div>
+      {% else %}
+        <div class="result-primary">
+          <span>Weather state</span>
+          <strong style="font-size:26px;">Awaiting image</strong>
+        </div>
+        <div class="benchmark-block"><div class="benchmark-label"><span>Confidence</span><strong>—</strong></div>
+          <div class="progress-track blue"><span style="width:0%"></span></div>
+          <div class="benchmark-scale"><span>0%</span><span>100%</span></div>
+        </div>
+      {% endif %}
+    </aside>
   </div>
-</div>
 
-{% if result %}
-<div class="section-title">All weather states</div>
-<div class="card">
-  <div class="stat-list">
-    {% for item in result.topk %}
-    <div class="stat-row">
-      <div class="name">{{ item.class }}</div>
-      <div class="bar-track"><span style="width: {{ (item.probability * 100)|round(1) }}%"></span></div>
-      <div class="val">{{ (item.probability * 100)|round(1) }}%</div>
+  {% if result %}
+  <article class="panel-card donut-card">
+    <div class="panel-header">
+      <div><span class="panel-kicker">CLASSIFIER</span><h2>State confidence split</h2></div>
+      <span class="panel-period">4 classes</span>
     </div>
-    {% endfor %}
-  </div>
-</div>
+    {{ donut(vision_items(result.topk),
+             center_value=pct(result.probability), center_label=result.prediction) }}
+  </article>
 
-<div class="section-title">Inference path</div>
-<div class="flowchart-wrap">
-  {{ pipeline(active=3) }}
-  <div class="flow-legend"><span>The weather-state CNN branch of the pipeline produced this result.</span></div>
-</div>
-{% endif %}
+  <article class="panel-card">
+    <div class="panel-header">
+      <div><span class="panel-kicker">ALL STATES</span><h2>Every prediction</h2></div>
+    </div>
+    <div class="panel-body">
+      <div class="rangebar-list">
+        {% for item in result.topk %}
+        <div class="rangebar">
+          <div class="rangebar-head"><span>{{ item.class }}</span><b>{{ pct(item.probability) }}</b></div>
+          <div class="rangebar-track">
+            <span class="rangebar-value" style="width: {{ (item.probability * 100)|round(1) }}%"></span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </article>
+
+  {% set lane = [
+    {'input_label': 'Image', 'input_value': 'field photo',
+     'input_icon': 'power', 'input_glyph': 'fa-image', 'input_active': true},
+    {'input_label': 'Resize', 'input_value': '224 x 224',
+     'input_icon': 'power', 'input_glyph': 'fa-crop-simple',
+     'process_label': 'Weather CNN', 'process_value': '1,124 images',
+     'process_icon': 'blue' if false else 'power', 'process_glyph': 'fa-brain',
+     'output_label': 'State', 'output_value': result.prediction}
+  ] %}
+  <article class="panel-card">
+    <div class="panel-header">
+      <div><span class="panel-kicker">PROCESS MAP</span><h2>Weather inference path</h2></div>
+    </div>
+    {{ flow(lane) }}
+  </article>
+  {% endif %}
+
+</section>
 {% endblock %}

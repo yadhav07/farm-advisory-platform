@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% from "_charts.html" import donut, gauge, radar, rangebars, flow %}
+
+{% block title %}Field node · FarmIQ{% endblock %}
+{% block crumb %}Field node{% endblock %}
+
+{% block content %}
+<section class="view">
+
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">FIELD NODE</p>
+      <h1>Connect the ESP32.</h1>
+      <p>
+        Enter the node's IP address to check it directly, or let the dashboard pick up
+        the readings it pushes to <code>/api/sensor-data</code> every few seconds.
+      </p>
+    </div>
+    <span class="scope-badge {{ 'green' if live and live.source == 'device' and live.online else 'cement' }}">
+      <i class="fa-solid fa-microchip"></i>
+      {{ 'Online' if live and live.source == 'device' and live.online else 'No live node' }}
+    </span>
+  </div>
+
+  <article class="panel-card">
+    <div class="panel-header">
+      <div><span class="panel-kicker">CONNECTION</span><h2>Field node address</h2></div>
+      <i class="fa-solid fa-network-wired panel-header-icon"></i>
+    </div>
+    <div class="panel-body">
+      <form method="post" class="ip-form">
+        <div class="field">
+          <label for="ip">IP address</label>
+          <input type="text" id="ip" name="ip" placeholder="192.168.1.50" value="{{ request.form.get('ip', '') }}" required>
+          <span class="hint">no protocol or port needed</span>
+        </div>
+        <div class="field" style="flex:0 0 200px;">
+          <label for="device_id">Device id</label>
+          <input type="text" id="device_id" name="device_id" placeholder="FARM_01" value="{{ selected }}">
+        </div>
+        <button type="submit" class="primary-button"><i class="fa-solid fa-plug"></i> Connect</button>
+      </form>
+
+      {% if probe %}
+      <div class="alert {{ 'info' if probe.ok else 'note' }}" style="margin-top:16px;margin-bottom:0;">
+        <i class="fa-solid {{ 'circle-check' if probe.ok else 'circle-info' }}"></i>
+        <span>
+          {% if probe.ok %}
+            Connected — {{ probe.detail }}{% if probe.latency_ms is defined %} in {{ probe.latency_ms }} ms{% endif %}.
+          {% else %}
+            No direct response — {{ probe.detail }}. Readings the node pushes are still used.
+          {% endif %}
+        </span>
+      </div>
+      {% endif %}
+    </div>
+  </article>
+
+  {% if live and live.source == 'device' %}
+  <div class="metric-grid" style="margin-top:16px;">
+    <article class="metric-card metric-card-total">
+      <div class="metric-topline">
+        <span>{{ live.device_id }}</span>
+        <span class="metric-icon metric-icon-total"><i class="fa-solid fa-microchip"></i></span>
+      </div>
+      <strong class="metric-value" style="font-size:22px;">{{ live.timestamp[11:19] }}</strong>
+      <p>{{ 'online' if live.online else 'idle' }} &middot; {{ live.source_ip or 'LAN' }}</p>
+    </article>
+    <article class="metric-card">
+      <div class="metric-topline"><span>Soil moisture</span><span class="metric-dot green"></span></div>
+      <strong class="metric-value">{{ fmt(live.sensor.Moisture) }}<small>%</small></strong>
+      <p>{{ 'measured' if live.provenance.Moisture == 'measured' else 'estimated' }}</p>
+    </article>
+    <article class="metric-card metric-card-amber">
+      <div class="metric-topline"><span>Air temperature</span><span class="metric-dot cement"></span></div>
+      <strong class="metric-value">{{ fmt(live.sensor.Temperature) }}<small>&deg;C</small></strong>
+      <p>DHT11</p>
+    </article>
+    <article class="metric-card metric-card-blue">
+      <div class="metric-topline"><span>Humidity</span><span class="metric-dot power"></span></div>
+      <strong class="metric-value">{{ fmt(live.sensor.Humidity) }}<small>%</small></strong>
+      <p>DHT11</p>
+    </article>
+    <article class="metric-card">
+      <div class="metric-topline"><span>Light</span><span class="metric-dot green"></span></div>
+      <strong class="metric-value">{{ fmt(live.sensor.Light_Intensity, 0) }}<small>lux</small></strong>
+      <p>BH1750</p>
+    </article>
+    {% if live.context.mq135_raw is not none %}
+    <article class="metric-card metric-card-amber">
+      <div class="metric-topline"><span>Air quality</span><span class="metric-dot cement"></span></div>
+      <strong class="metric-value">{{ fmt(live.context.mq135_index) }}</strong>
+      <p>MQ-135 raw {{ fmt(live.context.mq135_raw, 0) }}</p>
+    </article>
+    {% endif %}
+    {% if live.context.pressure %}
+    <article class="metric-card metric-card-saving">
+      <div class="metric-topline"><span>Pressure</span><span class="metric-dot green"></span></div>
+      <strong class="metric-value">{{ fmt(live.context.pressure) }}<small>hPa</small></strong>
+      <p>BME280</p>
+    </article>
+    {% endif %}
+    {% if live.context.bme_temperature is not none %}
+    <article class="metric-card">
+      <div class="metric-topline"><span>Ambient temp</span><span class="metric-dot violet"></span></div>
+      <strong class="metric-value">{{ fmt(live.context.bme_temperature) }}<small>&deg;C</small></strong>
+      <p>BME280</p>
+    </article>
+    {% endif %}
+  </div>
+
+  {% if result %}
+  <div class="overview-visual-grid">
+    <article class="panel-card">
+      <div class="panel-header">
+        <div><span class="panel-kicker">CLASSIFIER</span><h2>Disease split</h2></div>
+        <span class="panel-period">Live</span>
+      </div>
+      {{ donut(disease_items(result.probabilities),
+               center_value=pct(result.probabilities[result.prediction]),
+               center_label=result.prediction) }}
+    </article>
+    <article class="panel-card">
+      <div class="panel-header">
+        <div><span class="panel-kicker">REGRESSOR</span><h2>Yield_Rate forecast</h2></div>
+        <span class="panel-period">Live</span>
+      </div>
+      <div class="panel-body">{{ gauge(result.yield_forecast) }}</div>
+    </article>
+  </div>
+
+  <div class="overview-visual-grid">
+    <article class="panel-card">
+      <div class="panel-header">
+        <div><span class="panel-kicker">PROFILE</span><h2>Against ideal range</h2></div>
+        <i class="fa-solid fa-radar panel-header-icon"></i>
+      </div>
+      <div class="panel-body">{{ radar(live.sensor, fields) }}</div>
+    </article>
+    <article class="panel-card">
+      <div class="panel-header">
+        <div><span class="panel-kicker">RANGE CHECK</span><h2>Position in each range</h2></div>
+        <i class="fa-solid fa-ruler-horizontal panel-header-icon"></i>
+      </div>
+      <div class="panel-body">{{ rangebars(live.sensor, fields) }}</div>
+    </article>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  <article class="panel-card">
+    <div class="panel-header">
+      <div><span class="panel-kicker">KNOWN NODES</span><h2>Devices that have reported</h2></div>
+      <span class="panel-period">{{ devices|length }} node{{ '' if devices|length == 1 else 's' }}</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Device</th><th>IP address</th><th>Last reading</th>
+              <th class="table-num">Measured</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for d in devices %}
+          <tr>
+            <td class="table-batch"><strong>{{ d.device_id }}</strong><small>{{ 'ESP32 node' }}</small></td>
+            <td>{{ d.source_ip or '-' }}</td>
+            <td>{{ d.timestamp[11:19] }} UTC</td>
+            <td class="table-num">{{ d.firmware_measured }}/8</td>
+            <td>
+              {% if d.online %}<span class="badge ok">online</span>
+              {% else %}<span class="badge plain">idle {{ d.age_seconds }}s</span>{% endif %}
+            </td>
+            <td class="table-num">
+              <a href="{{ url_for('index') }}" style="color:var(--green);font-weight:800;">overview</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="table-empty">
+            No node has reported yet. Set <code>SERVER_URL</code> in the firmware to
+            <code>http://{{ request.host.split(':')[0] }}:5001/api/sensor-data</code>.
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <article class="panel-card">
+    <div class="panel-header">
+      <div><span class="panel-kicker">FIRMWARE CONTRACT</span><h2>Payload posted by the node</h2></div>
+      <i class="fa-solid fa-code panel-header-icon"></i>
+    </div>
+    <div class="panel-body">
+      <p class="panel-hint">
+        Temperature, humidity, moisture and light map straight onto model features.
+        Add <code>ph</code>, <code>nitrogen</code>, <code>phosphorus</code> and
+        <code>potassium</code> to replace the estimated values.
+      </p>
+      <pre class="payload-pre">{
+  "device_id": "FARM_01",
+  "soil_moisture": 44,
+  "air_temperature": 27.3,
+  "humidity": 64.8,
+  "light_intensity": 585.2,
+  "mq135_raw": 1240,
+  "bme_temperature": 26.1,
+  "pressure": 1008.4
+}</pre>
+    </div>
+  </article>
+
+</section>
+{% endblock %}

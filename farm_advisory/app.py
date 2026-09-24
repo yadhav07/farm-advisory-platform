@@ -117,7 +117,7 @@ def launch_web_ui(port=5001, open_browser=True):
 
     url = f'http://127.0.0.1:{port}'
     print('=' * 72)
-    print(' 🌾 FARM ADVISORY WEB UI '.center(72, '='))
+    print(' FARM ADVISORY WEB UI '.center(72, '='))
     print('=' * 72)
     print(f'[app] serving on {url}')
     print('[app] press CTRL+C to stop the server')
@@ -131,7 +131,7 @@ def launch_web_ui(port=5001, open_browser=True):
 
 def run(args):
     print('=' * 72)
-    print(' 🌾 FARM ADVISORY PIPELINE '.center(72, '='))
+    print(' FARM ADVISORY PIPELINE '.center(72, '='))
     print('=' * 72)
 
     # 1. Components -------------------------------------------------------

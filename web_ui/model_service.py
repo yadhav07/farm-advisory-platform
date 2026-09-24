@@ -252,6 +252,13 @@ def get_report_dir():
     return config.REPORT_DIR
 
 
+def get_device_registry():
+    """Shared ESP32 registry (latest reading per device + history)."""
+    _ensure_on_path(os.path.join(PROJECT_ROOT, 'farm_advisory'))
+    import device_ingest
+    return device_ingest.registry()
+
+
 def model_status():
     """Report which trained artifacts are present (used by tests/CLI)."""
     return {
@@ -289,6 +296,28 @@ def live_reading(stress_profile='normal'):
     node = SimulatedSensorNode('WEB-LIVE', seed=int(_time.time() // 30),
                                stress_profile=stress_profile)
     return node.read()
+
+
+def recent_reports(limit=6):
+    """Most recently written advisory reports, newest first."""
+    report_dir = get_report_dir()
+    if not os.path.isdir(report_dir):
+        return []
+    entries = []
+    for name in os.listdir(report_dir):
+        if not name.endswith(('.md', '.json')):
+            continue
+        full = os.path.join(report_dir, name)
+        try:
+            entries.append({
+                'name': name,
+                'size_kb': round(os.path.getsize(full) / 1024, 1),
+                'modified': os.path.getmtime(full),
+            })
+        except OSError:
+            continue
+    entries.sort(key=lambda item: item['modified'], reverse=True)
+    return entries[:limit]
 
 
 def get_farm_defaults():

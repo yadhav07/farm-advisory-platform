@@ -6,8 +6,9 @@ This repository is organized into four dedicated, self-contained model subsystem
 1. **IoT Sensor & Telemetry ML System (`./sensor_model/`)**: A tabular machine learning pipeline using Random Forest classification and continuous score synthesis to model soil/climate telemetry, optimize agronomic rule thresholds, calculate `Yield_Rate` metrics, and provide live interactive inference utilities (`test.py`) and visual reporting (`visualize.py`).
 2. **Leaf Disease Computer Vision System (`./leaf_disease_model/`)**: A PyTorch deep learning pipeline utilizing transfer learning (`EfficientNet-B0` & `ResNet50`) with automated image augmentation to diagnose plant leaf diseases from multi-class field photography.
 3. **Satellite Weather Prediction System (`./satellite_weather_model/`)**: A PyTorch Convolutional Neural Network (`Net`) pipeline for weather-state classification using real optical weather imagery (cloud / rain / shine / sunrise) with a synthetic fallback dataset generator.
-4. **Farm Advisory Application Layer (`./farm_advisory/`)**: The production integration layer - live weather feed (Open-Meteo), live IoT sensor ingestion, a rule-and-model fused recommendation engine, and automated report delivery (file + console, optional email/Telegram).
-5. **Web UI (`./web_ui/`)**: A self-contained Flask interface exposing every subsystem as a web tool - dashboard, sensor diagnosis, leaf/weather-state image uploads, live weather, and the full advisory pipeline with downloadable markdown/JSON reports.
+4. **Farm Advisory Application Layer (`./farm_advisory/`)**: The production integration layer - live weather feed (Open-Meteo), live IoT sensor ingestion, ESP32 field-node ingestion, a rule-and-model fused recommendation engine, and automated report delivery (file + console, optional email/Telegram).
+5. **Web UI (`./web_ui/`)**: A self-contained Flask dashboard exposing every subsystem as a web tool - overview, field-node connection by IP, sensor analytics, leaf/weather-state image uploads, live weather, and the full advisory pipeline with downloadable markdown/JSON reports. Every visual is rendered by the browser as HTML, CSS or inline SVG.
+6. **Hardware (`./hardware/`)**: ESP32 firmware that reads the DHT11, soil probe, BH1750, MQ-135, BME280 and SSD1306, pushes readings to the dashboard and also serves them for direct IP-address pulls.
 
 ---
 
@@ -16,7 +17,7 @@ This repository is organized into four dedicated, self-contained model subsystem
 ```
 Multidisciplinary_Project/
 │
-├── 🌾 sensor_model/                             # IoT Sensor & Telemetry Machine Learning Subsystem
+├── sensor_model/                             # IoT Sensor & Telemetry Machine Learning Subsystem
 │   ├── dataset/
 │   │   ├── plant_health_data.csv               # Empirical plant dataset (NPK nutrient & solar light distributions)
 │   │   ├── irrigation_prediction.csv           # Telemetry dataset (Soil moisture, pH, temperature, humidity)
@@ -33,7 +34,7 @@ Multidisciplinary_Project/
 │   ├── test.py                                 # Interactive CLI predictor & yield rate evaluator script
 │   └── visualize.py                            # Dedicated graph rendering and metric plotting script
 │
-├── 🍃 leaf_disease_model/                      # PyTorch Deep Learning Computer Vision Subsystem
+├── leaf_disease_model/                      # PyTorch Deep Learning Computer Vision Subsystem
 │   ├── dataset/
 │   │   ├── train/                              # Multi-class leaf image training subset
 │   │   ├── valid/                              # Validation leaf image subset
@@ -46,7 +47,7 @@ Multidisciplinary_Project/
 │   ├── train.py                                # Deep learning training pipeline (EfficientNet-B0 / ResNet50)
 │   └── test.py                                 # Model inference & evaluation script on test set images
 │
-├── 🛰️ satellite_weather_model/                 # Satellite Remote Sensing Weather Forecast Subsystem
+├── satellite_weather_model/                 # Satellite Remote Sensing Weather Forecast Subsystem
 │   ├── dataset/
 │   │   ├── train/{cloud, rain, shine, sunrise}/     # Real weather imagery (1,124 images, 70%)
 │   │   ├── valid/{cloud, rain, shine, sunrise}/     # Validation split (15%)
@@ -56,7 +57,7 @@ Multidisciplinary_Project/
 │   ├── main.py                                 # PyTorch satellite weather forecasting CNN script
 │   └── test.py                                 # Single-image inference & test-set evaluation
 │
-└── 🌾 farm_advisory/                           # Farm Advisory Application Layer
+└── farm_advisory/                           # Farm Advisory Application Layer
     ├── dataset/                                # Live sensor log CSV + weather API cache
     ├── outputs/                                # Generated advisory reports (markdown + JSON)
     ├── config.py                               # Central paths, farm location & delivery settings
@@ -64,18 +65,23 @@ Multidisciplinary_Project/
     ├── iot_ingestion.py                        # Live IoT sensor ingestion + simulator
     ├── recommendation_engine.py                # Fuses sensor/leaf/satellite models + rules
     ├── delivery.py                             # Automated recommendation delivery (file/console/email/Telegram)
+    ├── device_ingest.py                        # ESP32 field-node ingestion + device registry
     ├── app.py                                  # Entry point: web UI (default) or --cli pipeline
     └── test.py                                 # Self-test of the whole advisory chain
 │
-└── 🖥️ web_ui/                                  # Flask Web Dashboard Subsystem
-    ├── templates/                              # Jinja2 templates (base + pages + SVG flowchart)
-    ├── static/style.css                        # Dashboard stylesheet
-    ├── app.py                                  # Flask routes + chart dispatch
-    ├── charts.py                               # Server-side matplotlib chart factory
+└── web_ui/                                  # Flask Web Dashboard Subsystem
+    ├── templates/                              # Jinja2 templates (pages + _charts macros)
+    ├── static/style.css                        # Workspace design system
+    ├── app.py                                  # Flask routes + field-node API
+    ├── viz.py                                  # Chart geometry helpers (no image output)
     ├── model_service.py                        # Lazy-loaded, cached inference helpers
     ├── requirements.txt                        # Flask dependency pin
     ├── README.md                               # Run & usage notes
     └── uploads/                                # Runtime folder for image uploads (auto-cleaned)
+│
+└── hardware/                                 # Embedded Field Node
+    └── esp32_farm_node/
+        └── esp32_farm_node.ino                # ESP32 firmware: sensors, OLED, push + pull endpoints
 ```
 
 ---
@@ -101,18 +107,19 @@ Multidisciplinary_Project/
 | **`farm_advisory`** | `config.py` | Python Script | Central configuration - model artifact paths, farm latitude/longitude, agronomic thresholds, weather cache TTL and delivery settings (email/Telegram disabled by default). |
 | **`farm_advisory`** | `weather_feed.py` | Python Script | Live weather feed module. Polls the Open-Meteo API (no key required) for current conditions + 3-day forecast, caches snapshots on disk, and degrades to cached/offline fallback on network failure. |
 | **`farm_advisory`** | `iot_ingestion.py` | Python Script | Live IoT sensor ingestion. `SensorIngestion` validates, clamps and appends 8-feature telemetry to `dataset/sensor_log.csv`; `SimulatedSensorNode` emits realistic streaming readings with a diurnal cycle, drift and configurable stress profiles. |
+| **`farm_advisory`** | `device_ingest.py` | Python Script | ESP32 field-node ingestion. Maps the firmware payload (`soil_moisture`, `air_temperature`, `humidity`, `light_intensity`, `mq135_raw`, `bme_temperature`, `pressure`) onto the 8-feature model schema, estimates `PH`/NPK when those probes are absent, tags every value as measured or estimated, appends to `dataset/device_readings.csv`, keeps `dataset/devices.json`, and probes a node by IP address. |
 | **`farm_advisory`** | `recommendation_engine.py` | Python Script | Recommendation engine. Fuses the sensor Random Forest, yield regressor, leaf disease CNN, satellite weather CNN and live weather into prioritized, evidence-backed agronomic actions (irrigation, fertilization, pH amendment, disease control, spraying windows). |
 | **`farm_advisory`** | `delivery.py` | Python Script | Automated recommendation delivery. Renders markdown + JSON reports under `outputs/`, prints console summaries, and optionally pushes via SMTP email or a Telegram bot when configured. |
 | **`farm_advisory`** | `app.py` | Python Script | Unified entry point. `python app.py` launches the Flask web UI (browser opens automatically); `python app.py --cli` (or passing any pipeline option such as `--steps`, `--leaf`, `--offline`) runs the end-to-end live CLI pipeline - ingest telemetry, fetch weather, run the engine and deliver reports. |
 | **`farm_advisory`** | `test.py` | Python Script | Self-test of the advisory chain (healthy + stressed readings, live/cached weather, leaf image, file delivery). |
-| **`web_ui`** | `app.py` | Python Script | Flask application. Serves the dashboard pages, dispatches `/chart/<kind>` PNG rendering from a short-lived in-memory result store, and serves downloadable advisory reports from `farm_advisory/outputs/`. |
-| **`web_ui`** | `charts.py` | Python Script | Server-side chart factory (matplotlib `Agg`). Renders the disease donut, yield gauge, sensor radar, range bars, telemetry small-multiples, vision donut, weather forecast and priority-mix charts as PNG bytes, guarded by a lock for Flask's threaded server. |
+| **`web_ui`** | `app.py` | Python Script | Flask application. Serves the dashboard pages, registers the `viz` helpers as Jinja globals, and serves downloadable advisory reports from `farm_advisory/outputs/`. |
+| **`web_ui`** | `viz.py` | Python Script | Geometry-only chart helpers. Builds CSS `conic-gradient` donuts, gauge arcs and needle positions, radar polygons, sparkline polyline points and forecast bar geometry. No image or file is produced - the browser draws everything. |
 | **`web_ui`** | `model_service.py` | Python Script | Shared inference layer. Lazy-loads and caches every trained artifact (sensor bundle, EfficientNet-B0, weather CNN), reads the logged telemetry history, produces live simulated-node readings, and resolves farm defaults and report delivery. All deep models run on CPU. |
-| **`web_ui`** | `templates/_flowchart.html` | Jinja2 Macro | Hand-authored inline-SVG pipeline flowchart (inputs → preprocessing → models → fusion → output) that highlights the stage each page exercises. |
-| **`web_ui`** | `templates/*.html` | Jinja2 Templates | `base.html` (sidebar shell) plus per-page templates for overview, sensor, leaf, satellite, weather and advisory dashboards. |
-| **`web_ui`** | `static/style.css` | CSS | Dashboard stylesheet - sidebar navigation, KPI tiles, chart cards, priority-coded action cards, forms and tables. |
+| **`web_ui`** | `templates/_charts.html` | Jinja2 Macros | Chart component library: `donut`, `gauge`, `radar`, `rangebars`, `sparkgrid`, `forecast`, `flow` and `suggestions`, composed from HTML, CSS and inline SVG. |
+| **`web_ui`** | `templates/*.html` | Jinja2 Templates | `base.html` (workspace shell: sidebar, top bar, footer) plus per-page templates for overview, field node, sensor, leaf, sky, weather and advisory. |
+| **`web_ui`** | `static/style.css` | CSS | Workspace design system — design tokens, sidebar and top bar, metric cards, panel cards, flow lanes, donut, gauge, radar, range bars, sparklines, forecast columns, tables, suggestion cards, sliders and toasts. |
 | **`web_ui`** | `uploads/` | Runtime Data | Temporary storage for uploaded leaf/sky images; files and the folder are removed after inference to keep the tree tidy. |
-| **`web_ui`** | `README.md` | Documentation | How to install requirements, start the server, what each page shows and the chart catalogue. |
+| **`web_ui`** | `README.md` | Documentation | How to install requirements, start the server, what each page shows and the chart component list. |
 
 ---
 
@@ -285,13 +292,13 @@ The application layer turns the three trained model subsystems into a production
 
 ```mermaid
 flowchart LR
-    A[📡 Live IoT Sensors] --> D[Recommendation Engine]
-    B[🌦️ Live Weather Feed] --> D
-    C1[🌱 Sensor RF + Yield Regressor] --> D
-    C2[🍃 Leaf Disease CNN] --> D
-    C3[🛰️ Weather State CNN] --> D
-    D --> E[💡 Recommendations]
-    E --> F[📲 Automated Delivery]
+    A[Live IoT Sensors] --> D[Recommendation Engine]
+    B[Live Weather Feed] --> D
+    C1[Sensor RF + Yield Regressor] --> D
+    C2[Leaf Disease CNN] --> D
+    C3[Weather State CNN] --> D
+    D --> E[Recommendations]
+    E --> F[Automated Delivery]
     F --> G[Report Files + Console]
     F --> H[Email / Telegram - optional]
 ```
@@ -307,36 +314,59 @@ Key design points:
 
 ## 6. Web Dashboard (`./web_ui/`)
 
-A chart-driven Flask dashboard over every trained subsystem. Models are loaded once and cached (running on CPU), and every visual is rendered **server-side** with matplotlib, so there is no JavaScript charting library and no CDN:
+A Flask dashboard over every trained subsystem. Models are loaded once and cached (running on CPU), and **every visual is rendered by the browser as HTML, CSS or inline SVG** - there is no server-side image generation, no matplotlib and no JavaScript charting library. Python only supplies coordinates, percentages and gradient strings through the `viz` helpers:
 
 | Route | Page | Function |
 | :--- | :--- | :--- |
-| `/` | Overview | Live simulated-node telemetry through the Random Forest heads, KPI tiles, model charts, logged-telemetry time series and the pipeline flowchart. |
+| `/` | Overview | Live field-node (or simulated) telemetry through the Random Forest heads, KPI tiles, disease donut, yield gauge, profile radar, forecast columns, telemetry history and the pipeline flowchart. |
+| `/device` | Field node | IP-address connection panel, reachability probe, known-node table with online/idle state, latest reading and the firmware payload contract. |
+| `POST /api/sensor-data` | Field-node API | Ingests the ESP32 JSON payload, maps it to the 8-feature schema, stores it and returns the crop-state and yield assessment. |
+| `GET /api/devices` | Field-node API | Known nodes with IP address, last reading, measured-feature count and online state. |
+| `GET /api/latest` | Field-node API | Latest reading (device or simulated) with mapped features, context signals and measured/estimated provenance. |
 | `/sensor` | Sensor analytics | 8-field telemetry (live by default, custom on submit) -> disease donut, yield gauge, profile radar and per-feature range bars. |
 | `/leaf` | Leaf vision | Image upload -> EfficientNet-B0 diagnosis with a confidence donut and top-k bars. |
 | `/satellite` | Sky vision | Image upload -> weather-state CNN classification with a confidence donut. |
-| `/weather` | Weather | Live conditions as KPI tiles plus a 3-day forecast chart (temperature range + precipitation probability). |
-| `/advisory` | Advisory | Full pipeline -> priority-mix donut, disease donut, ranked action cards and downloadable markdown/JSON reports from `farm_advisory/outputs/`. |
-| `/chart/<kind>` | Chart API | Renders any dashboard chart as PNG from a stored result payload. |
+| `/weather` | Weather | Live conditions as KPI tiles plus a 3-day forecast column chart. |
+| `/advisory` | Advisory | Full pipeline -> priority-mix donut, disease donut, yield gauge, ranked action cards and downloadable markdown/JSON reports from `farm_advisory/outputs/`. |
 
-### 6.1 Chart Catalogue
+### 6.0 Field-Node Data Path
 
-| Chart kind | Visual |
-| :--- | :--- |
-| `disease` | donut of disease class probabilities |
-| `yield` | semicircular gauge for the Yield_Rate forecast |
-| `radar` | sensor profile against each feature's ideal range |
-| `bars` | reading position inside each admissible range (out-of-range in red) |
-| `telemetry` | small-multiple time series of the logged readings (one scale per panel) |
-| `vision` | donut of leaf / weather-state classifier confidences |
-| `forecast` | 3-day temperature-range bars + precipitation-probability line |
-| `priority` | donut of advisory actions grouped by priority |
+```mermaid
+flowchart LR
+    S[ESP32 sensors] --> F[firmware]
+    F -->|POST /api/sensor-data every 10s| API[Flask field-node API]
+    F -->|GET /api/sensor-data on request| U[IP input in /device]
+    U --> API
+    API --> M[device_ingest.map_to_sensor_schema]
+    M --> R[(device_readings.csv + devices.json)]
+    M --> RF[Random Forest heads]
+    R --> D[Overview dashboard]
+    RF --> D
+```
+
+Sensor mapping and provenance rules are documented in
+`farm_advisory/device_ingest.py`.
+
+### 6.1 Chart Components
+
+| Component | Technique | Visual |
+| :--- | :--- | :--- |
+| `donut` | CSS `conic-gradient` with a masked centre | disease probabilities, classifier confidence, advisory priority mix |
+| `gauge` | inline SVG arc with `stroke-dasharray` + needle line | Yield_Rate forecast |
+| `radar` | inline SVG polygons, rings and axes | sensor profile against the ideal midpoint |
+| `rangebars` | HTML/CSS bars over a track | reading position inside each admissible range |
+| `sparkgrid` | inline SVG polylines | small-multiple telemetry time series |
+| `forecast` | HTML/CSS positioned columns | 3-day temperature range and precipitation |
+| `flow` | HTML/CSS nodes with arrow connectors | signal-flow lanes (inputs → model → output) |
+| `suggestions` | HTML cards | ranked advisory actions with priority badges |
 
 ### 6.2 Design Points
+- **Workspace shell** - a fixed sidebar (brand, grouped navigation, node status card), a sticky top bar with breadcrumbs and live-node state, and a content column built from metric cards, panel cards, data tables and suggestion lists.
+- **Slider-based simulators** - the sensor and advisory inputs use `input[type=range]` with live readouts and a JS-painted progress track, replacing plain number boxes.
 - **Single inference layer** (`model_service.py`) - every model artifact (sensor `rf_model.joblib`, leaf checkpoint, satellite checkpoint) is loaded lazily into a module-level singleton and reused across requests.
-- **Server-side charting** (`charts.py`) - matplotlib with the `Agg` backend renders PNG bytes, guarded by a lock because Flask serves requests on multiple threads.
-- **In-flight result store** - a page runs inference once, stores the chart payload under a short id, and each `<img>` fetches `/chart/<kind>?id=...`, so charts never re-run a model.
-- **Inline SVG flowcharts** (`_flowchart.html`) - the five-stage data-flow diagram is hand-authored SVG, highlighting the stage a page exercises; no diagram library needed.
+- **Geometry-only Python** (`viz.py`) - pure functions for donut gradients, gauge arcs, radar polygons, sparkline points, forecast bars and history statistics, registered as Jinja globals. Nothing is rasterised.
+- **Reusable macros** - `_charts.html` exposes every visual as a Jinja macro, so pages compose charts declaratively and the markup stays semantic and accessible (`role="img"`, `aria-label`).
+- **Typography and icons** - Manrope and Font Awesome load from a CDN; charts have no external dependency and the layout degrades cleanly if the font or icon set fails to load.
 - **Clean runtime behaviour** - uploaded images are saved to `uploads/` with a unique name, processed, then removed so the repository stays tidy.
 - **Report downloads** are served through a validated route (`secure_filename`) with no filesystem traversal risk.
 - The Flask development server is intended for local/demo use; production deployments should run it behind a WSGI server such as `waitress` or `gunicorn`.

@@ -87,7 +87,7 @@ def main():
                 print('[test] WARNING: stressed reading produced no recommendations!')
 
     print('\n' + '=' * 72)
-    print('PASSED ✅' if passed else 'FAILED ❌', '— self-test result')
+    print('PASSED' if passed else 'FAILED', '— self-test result')
     print('=' * 72)
     return 0 if passed else 1
 

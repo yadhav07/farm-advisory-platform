@@ -1,0 +1,212 @@
+{#-
+  Chart components. Every visual is plain HTML, CSS or inline SVG - the
+  browser draws them. Geometry comes from the viz.py Jinja globals.
+-#}
+
+{#- Donut: disease / confidence / priority mix -#}
+{% macro donut(items, center_value=None, center_label=None, colors=None) %}
+{% set d = donut_segments(items, colors=colors, center_value=center_value, center_label=center_label) %}
+<div class="donut-layout">
+  <div class="donut-wrap" style="background: {{ d.gradient }}">
+    <div class="donut-center">
+      <span>{{ d.center_value }}</span>
+      <small>{{ d.center_label }}</small>
+    </div>
+  </div>
+  <div class="donut-legend">
+    {% for s in d.segments[:5] %}
+    <div class="legend-row">
+      <span class="legend-swatch" style="background: {{ s.color }}"></span>
+      <div><strong>{{ s.label }}</strong><small>{{ s.pct|round(1) }}% of total</small></div>
+      <span>{{ s.pct|round(1) }}%</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endmacro %}
+
+
+{#- Semicircular gauge -#}
+{% macro gauge(value, label='Yield_Rate forecast', low=10.0, high=100.0) %}
+{% set g = gauge_geometry(value, low, high) %}
+<div class="gauge-wrap">
+  <svg viewBox="0 0 {{ g.width }} {{ g.height }}" class="gauge-svg" role="img"
+       aria-label="{{ label }} {{ fmt(value, 1) }}">
+    <path d="{{ g.track_path }}" fill="none" stroke="#e8ecea" stroke-width="18" stroke-linecap="round"/>
+    <path d="{{ g.track_path }}" fill="none" stroke="{{ g.color }}" stroke-width="18"
+          stroke-linecap="round" stroke-dasharray="{{ g.dasharray }}"/>
+    <line x1="{{ g.cx }}" y1="{{ g.cy }}" x2="{{ g.tip_x }}" y2="{{ g.tip_y }}"
+          stroke="#4f5f57" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="{{ g.cx }}" cy="{{ g.cy }}" r="5.5" fill="#4f5f57"/>
+  </svg>
+  <div class="gauge-readout">
+    <strong>{{ fmt(value, 1) }}</strong>
+    <span>{{ label }}</span>
+  </div>
+  <div class="gauge-scale"><span>{{ fmt(low, 0) }}</span><span>{{ fmt(high, 0) }}</span></div>
+</div>
+{% endmacro %}
+
+
+{#- Radar -#}
+{% macro radar(values, guide) %}
+{% set r = radar_geometry(values, guide) %}
+<svg viewBox="0 0 {{ r.size }} {{ r.size }}" class="radar-svg" role="img"
+     aria-label="Sensor profile against ideal range">
+  {% for ring in r.rings %}
+  <polygon points="{{ ring }}" fill="none" stroke="#e5ebe7" stroke-width="1"/>
+  {% endfor %}
+  {% for axis in r.axes %}
+  <line x1="{{ axis.x1 }}" y1="{{ axis.y1 }}" x2="{{ axis.x2 }}" y2="{{ axis.y2 }}"
+        stroke="#eef2ef" stroke-width="1"/>
+  <text x="{{ axis.label_x }}" y="{{ axis.label_y }}" text-anchor="{{ axis.anchor }}"
+        dominant-baseline="middle" class="radar-label">{{ axis.label }}</text>
+  {% endfor %}
+  <polygon points="{{ r.ideal }}" fill="none" stroke="#2878d0" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <polygon points="{{ r.current }}" fill="rgba(24,121,78,0.18)" stroke="#18794e"
+           stroke-width="2.2" stroke-linejoin="round"/>
+  {% for x, y, text in r.dots %}
+  <circle cx="{{ x }}" cy="{{ y }}" r="3" fill="#18794e"/>
+  {% endfor %}
+</svg>
+<div class="legend-inline">
+  <span><i class="swatch green"></i>current reading</span>
+  <span><i class="swatch dashed"></i>ideal midpoint</span>
+</div>
+{% endmacro %}
+
+
+{#- Reading position inside each admissible range -#}
+{% macro rangebars(values, guide) %}
+<div class="rangebar-list">
+  {% for field in guide %}
+  {% set v = values.get(field.name, field.default) %}
+  {% set pos = bar_position(v, field.low, field.high) %}
+  {% set ok = in_range(v, field.low, field.high) %}
+  <div class="rangebar">
+    <div class="rangebar-head">
+      <span>{{ field.label }} <em>{{ field.unit }}</em></span>
+      <b class="{{ '' if ok else 'bad' }}">{{ fmt(v, 1) }}</b>
+    </div>
+    <div class="rangebar-track">
+      <span class="rangebar-ideal"></span>
+      <span class="rangebar-value {{ '' if ok else 'bad' }}" style="width: {{ pos|round(1) }}%"></span>
+    </div>
+    <div class="rangebar-scale"><span>{{ field.low }}</span><span>ideal band</span><span>{{ field.high }}</span></div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+
+{#- Small-multiple telemetry time series -#}
+{% macro sparkgrid(records) %}
+{% set panels = [
+  {'title': 'Temperature',   'series': [('Temperature', 'C', '#d97706')]},
+  {'title': 'Humidity',      'series': [('Humidity', '%', '#2878d0')]},
+  {'title': 'Light',         'series': [('Light_Intensity', 'lux', '#f2b705')]},
+  {'title': 'Soil moisture', 'series': [('Moisture', '%', '#18794e')]},
+  {'title': 'Soil pH',       'series': [('PH', 'pH', '#6b4fc4')]},
+  {'title': 'Nitrogen',      'series': [('Nitrogen', 'mg/kg', '#18794e')]},
+  {'title': 'Phosphorus',    'series': [('Phosphorus', 'mg/kg', '#d97706')]},
+  {'title': 'Potassium',     'series': [('Potassium', 'mg/kg', '#2878d0')]}
+] %}
+{% if not records %}
+<div class="empty">No telemetry logged yet. Readings appear here as the node reports.</div>
+{% else %}
+<div class="spark-grid">
+  {% for panel in panels %}
+  <div class="spark-panel">
+    <div class="spark-title">{{ panel.title }}</div>
+    <svg viewBox="0 0 320 96" preserveAspectRatio="none" class="spark-svg" role="img"
+         aria-label="{{ panel.title }} over time">
+      {% for field, unit, color in panel.series %}
+        {% set s = sparkline(records | map(attribute=field) | list) %}
+        {% if s.points %}
+        <polyline points="{{ s.points }}" fill="none" stroke="{{ color }}" stroke-width="2.2"
+                  stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        {% endif %}
+      {% endfor %}
+    </svg>
+    <div class="spark-foot">
+      {% for field, unit, color in panel.series %}
+        {% set s = sparkline(records | map(attribute=field) | list) %}
+        <span><i class="metric-dot" style="background: {{ color }}"></i>{{ s.min|round(1) }}&ndash;{{ s.max|round(1) }} {{ unit }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endmacro %}
+
+
+{#- Weather forecast columns -#}
+{% macro forecast(rows) %}
+{% if not rows %}
+<div class="empty">Forecast unavailable right now.</div>
+{% else %}
+{% set g = forecast_geometry(rows) %}
+<div class="forecast">
+  {% for day in g.days %}
+  {% if day.valid %}
+  <div class="fc-day">
+    <div class="fc-bar-wrap" style="height: {{ g.usable }}px">
+      <span class="fc-bar" style="bottom: {{ day.bottom }}px; height: {{ day.height }}px">
+        <b class="fc-max">{{ day.t_max|round(0) }}&deg;</b>
+        <b class="fc-min">{{ day.t_min|round(0) }}&deg;</b>
+      </span>
+    </div>
+    <div class="fc-date">{{ day.date[5:] }}</div>
+    <div class="fc-precip">{{ day.precip_prob|round(0) }}% precip</div>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+{% endmacro %}
+
+
+{#- Pipeline flow lanes -#}
+{% macro flow(rows, title='') %}
+<div class="flowchart">
+  {% for row in rows %}
+  <div class="flow-lane">
+    <div class="flow-node {{ 'flow-input-active' if row.input_active }}">
+      <span class="flow-node-icon {{ row.input_icon }}"><i class="fa-solid {{ row.input_glyph }}"></i></span>
+      <div><small>{{ row.input_label }}</small><strong>{{ row.input_value }}</strong></div>
+    </div>
+    <div class="flow-arrow"><span></span><i class="fa-solid fa-chevron-right"></i></div>
+    <div class="flow-node">
+      <span class="flow-node-icon {{ row.process_icon }}"><i class="fa-solid {{ row.process_glyph }}"></i></span>
+      <div><small>{{ row.process_label }}</small><strong>{{ row.process_value }}</strong></div>
+    </div>
+    <div class="flow-arrow"><span></span><i class="fa-solid fa-chevron-right"></i></div>
+    <div class="flow-node flow-output">
+      <div><small>{{ row.output_label }}</small><strong>{{ row.output_value }}</strong></div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+
+{#- Advisory suggestion list -#}
+{% macro suggestions(recommendations) %}
+<div class="suggestion-list">
+  {% for rec in recommendations %}
+  <div class="suggestion-item">
+    <span class="suggestion-icon {{ 'green' if rec.priority == 'Low' else ('amber' if rec.priority == 'Medium' else 'blue') }}">
+      <i class="fa-solid {{ 'circle-check' if rec.priority == 'Low' else ('triangle-exclamation' if rec.priority == 'Medium' else 'bolt') }}"></i>
+    </span>
+    <span class="suggestion-copy">
+      <strong>{{ rec.action }}</strong>
+      <span>{{ rec.rationale }}</span>
+    </span>
+    <span class="suggestion-impact">
+      <span class="badge {{ rec.priority|lower }}">{{ rec.priority }}</span>
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}

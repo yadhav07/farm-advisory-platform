@@ -1,70 +1,123 @@
 {% extends "base.html" %}
-{% from "_flowchart.html" import pipeline %}
+{% from "_charts.html" import donut, flow %}
 
-{% block title %}Leaf Vision · Farm Advisory Platform{% endblock %}
-{% block heading %}Leaf Disease Vision{% endblock %}
-{% block subheading %}EfficientNet-B0 transfer-learning classifier on field leaf photographs{% endblock %}
+{% block title %}Leaf vision · FarmIQ{% endblock %}
+{% block crumb %}Leaf vision{% endblock %}
 
 {% block content %}
-<div class="two-col">
-  <div class="card">
-    <h2>Upload a leaf</h2>
-    <p class="hint">A single photograph is resized to 224×224, normalised with ImageNet statistics and passed through the trained CNN.</p>
-    <form method="post" enctype="multipart/form-data">
-      <div class="field">
-        <label for="image">Leaf photograph</label>
-        <input type="file" id="image" name="image" accept="image/*" required>
-        <div class="hint">PNG, JPG, JPEG, WebP or BMP</div>
-      </div>
-      <div class="actions"><button type="submit">Diagnose leaf</button></div>
-    </form>
+<section class="view">
+
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">LEAF VISION</p>
+      <h1>Diagnose a leaf in seconds.</h1>
+      <p>
+        A field photograph is resized to 224&times;224, normalised with ImageNet
+        statistics and classified by an EfficientNet-B0 model fine-tuned on
+        multi-class leaf imagery.
+      </p>
+    </div>
+    <span class="scope-badge cement"><i class="fa-solid fa-leaf"></i> EfficientNet-B0</span>
   </div>
 
-  <div>
-    {% if result %}
-    <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
-      <div class="kpi {{ '' if 'healthy' in result.prediction else 'red' }}">
-        <div class="label">Diagnosis</div>
-        <div class="value" style="font-size:1.25rem;">{{ result.prediction }}</div>
-        <div class="sub">{{ (result.probability * 100)|round(1) }}% confidence</div>
+  <div class="simulator-grid">
+    <article class="panel-card controls-card">
+      <div class="panel-header controls-header">
+        <div><span class="panel-kicker">UPLOAD</span><h2>Leaf photograph</h2></div>
       </div>
-      <div class="kpi teal">
-        <div class="label">Classes</div>
-        <div class="value">{{ result.all_probabilities|length }}</div>
-        <div class="sub">leaf disease categories</div>
+      <div class="panel-body">
+        <form method="post" enctype="multipart/form-data">
+          <div class="field">
+            <label for="image">Choose an image</label>
+            <input type="file" id="image" name="image" accept="image/*" required>
+            <span class="hint">PNG, JPG, JPEG, WebP or BMP</span>
+          </div>
+          <div class="actions">
+            <button type="submit" class="primary-button"><i class="fa-solid fa-magnifying-glass"></i> Diagnose leaf</button>
+          </div>
+        </form>
       </div>
-    </div>
+    </article>
 
-    <div class="chart-card" style="margin-top:18px;">
-      <div class="head"><h3>Class confidence</h3><span class="tag">best_leaf_disease_model.pth</span></div>
-      <div class="chart-frame">
-        <img src="{{ url_for('chart', kind='vision', id=result_id) }}" alt="Donut chart of leaf disease confidences">
+    <aside class="panel-card result-card {{ 'green' if result and 'healthy' in result.prediction else 'amber' }}">
+      <div class="result-topline">
+        <span class="panel-kicker">PREDICTED OUTPUT</span>
+        {% if result %}<span class="live-tag"><i></i> Live</span>{% endif %}
       </div>
-    </div>
-    {% else %}
-    <div class="card"><div class="empty">Upload a leaf photo to see the model's confidence distribution.</div></div>
-    {% endif %}
+      {% if result %}
+        <div class="result-primary">
+          <span>Diagnosis</span>
+          <strong style="font-size:clamp(24px,2.6vw,32px);">{{ result.prediction }}</strong>
+        </div>
+        <div class="benchmark-block">
+          <div class="benchmark-label"><span>Confidence</span><strong>{{ pct(result.probability) }}</strong></div>
+          <div class="progress-track"><span style="width: {{ (result.probability * 100)|round(1) }}%"></span></div>
+          <div class="benchmark-scale"><span>0%</span><span>EfficientNet-B0</span><span>100%</span></div>
+        </div>
+        <div class="result-detail-grid">
+          <div><span>Classes</span><strong>{{ result.all_probabilities|length }}</strong></div>
+          <div><span>Top-2 margin</span><strong>{{ pct(result.topk[0].probability - result.topk[1].probability) }}</strong></div>
+        </div>
+      {% else %}
+        <div class="result-primary">
+          <span>Diagnosis</span>
+          <strong style="font-size:26px;">Awaiting image</strong>
+        </div>
+        <div class="benchmark-block"><div class="benchmark-label"><span>Confidence</span><strong>—</strong></div>
+          <div class="progress-track"><span style="width:0%"></span></div>
+          <div class="benchmark-scale"><span>0%</span><span>100%</span></div>
+        </div>
+      {% endif %}
+    </aside>
   </div>
-</div>
 
-{% if result %}
-<div class="section-title">Top predictions</div>
-<div class="card">
-  <div class="stat-list">
-    {% for item in result.topk %}
-    <div class="stat-row">
-      <div class="name">{{ item.class }}</div>
-      <div class="bar-track"><span style="width: {{ (item.probability * 100)|round(1) }}%"></span></div>
-      <div class="val">{{ (item.probability * 100)|round(1) }}%</div>
+  {% if result %}
+  <article class="panel-card donut-card">
+    <div class="panel-header">
+      <div><span class="panel-kicker">CLASSIFIER</span><h2>Class confidence split</h2></div>
+      <span class="panel-period">Top 5</span>
     </div>
-    {% endfor %}
-  </div>
-</div>
+    {{ donut(vision_items(result.topk),
+             center_value=pct(result.probability), center_label=result.prediction) }}
+  </article>
 
-<div class="section-title">Inference path</div>
-<div class="flowchart-wrap">
-  {{ pipeline(active=3) }}
-  <div class="flow-legend"><span>The EfficientNet-B0 branch of the pipeline produced this result.</span></div>
-</div>
-{% endif %}
+  <article class="panel-card">
+    <div class="panel-header">
+      <div><span class="panel-kicker">ALL CLASSES</span><h2>Every prediction</h2></div>
+    </div>
+    <div class="panel-body">
+      <div class="rangebar-list">
+        {% for item in result.topk %}
+        <div class="rangebar">
+          <div class="rangebar-head">
+            <span>{{ item.class }}</span>
+            <b>{{ pct(item.probability) }}</b>
+          </div>
+          <div class="rangebar-track">
+            <span class="rangebar-value" style="width: {{ (item.probability * 100)|round(1) }}%"></span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </article>
+
+  {% set lane = [
+    {'input_label': 'Image', 'input_value': 'field photo',
+     'input_icon': 'cement', 'input_glyph': 'fa-image', 'input_active': true},
+    {'input_label': 'Resize', 'input_value': '224 x 224',
+     'input_icon': 'cement', 'input_glyph': 'fa-crop-simple',
+     'process_label': 'EfficientNet-B0', 'process_value': 'fine-tuned',
+     'process_icon': 'green', 'process_glyph': 'fa-brain',
+     'output_label': 'Diagnosis', 'output_value': result.prediction}
+  ] %}
+  <article class="panel-card">
+    <div class="panel-header">
+      <div><span class="panel-kicker">PROCESS MAP</span><h2>Leaf inference path</h2></div>
+    </div>
+    {{ flow(lane) }}
+  </article>
+  {% endif %}
+
+</section>
 {% endblock %}

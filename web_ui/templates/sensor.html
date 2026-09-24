@@ -1,124 +1,183 @@
 {% extends "base.html" %}
-{% from "_flowchart.html" import pipeline %}
+{% from "_charts.html" import donut, gauge, radar, rangebars, flow %}
 
-{% block title %}Sensor Analytics · Farm Advisory Platform{% endblock %}
-{% block heading %}Sensor Analytics{% endblock %}
-{% block subheading %}Random Forest disease classification and Yield_Rate regression on 8-field telemetry{% endblock %}
-
-{% block topbar_right %}
-  {% if is_live %}<span class="live-pill"><span class="dot"></span>live reading</span>
-  {% else %}<span class="badge info">custom reading</span>{% endif %}
-{% endblock %}
+{% block title %}Sensor model · FarmIQ{% endblock %}
+{% block crumb %}Sensor model{% endblock %}
 
 {% block content %}
+<section class="view">
 
-<div class="two-col">
-  <!-- control panel -->
-  <div class="card">
-    <h2>Control panel</h2>
-    <p class="hint">The dashboard shows a live node reading by default. Enter your own values to re-run the model.</p>
-
-    <form method="post">
-      <div class="form-grid">
-        {% for f in fields %}
-        <div class="field">
-          <label for="{{ f.name }}">{{ f.label }} <span class="unit">({{ f.unit }})</span></label>
-          <input type="number" id="{{ f.name }}" name="{{ f.name }}"
-                 step="{{ f.step }}" min="{{ f.low }}" max="{{ f.high }}"
-                 value="{{ values.get(f.name, f.default) }}" required>
-          <div class="hint">ideal {{ f.low }}–{{ f.high }}</div>
-        </div>
-        {% endfor %}
-      </div>
-      <div class="actions">
-        <button type="submit">Run model</button>
-        <a class="btn secondary small" href="{{ url_for('sensor') }}">Reset to live</a>
-      </div>
-    </form>
-  </div>
-
-  <!-- model output -->
-  <div>
-    {% if result %}
-    <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));">
-      <div class="kpi {{ '' if result.prediction == 'Healthy' else 'red' }}">
-        <div class="label">Crop state</div>
-        <div class="value">{{ result.prediction }}</div>
-        <div class="sub">{{ (result.probabilities[result.prediction] * 100)|round(1) }}% confidence</div>
-      </div>
-      <div class="kpi blue">
-        <div class="label">Yield_Rate</div>
-        <div class="value">{{ result.yield_forecast }}</div>
-        <div class="sub">regressor output</div>
-      </div>
-      <div class="kpi {{ 'amber' if risk[1] >= 0.25 else '' }}">
-        <div class="label">Top risk</div>
-        <div class="value">{{ (risk[1] * 100)|round(1) }}%</div>
-        <div class="sub">{{ risk[0].replace('_', ' ') if risk[0] else '—' }}</div>
-      </div>
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">SENSOR MODEL</p>
+      <h1>Move the sliders, watch the model.</h1>
+      <p>
+        The eight telemetry features feed a Random Forest disease classifier and a
+        continuous yield regressor. Live field-node values are pre-loaded; drag any
+        slider to test a scenario.
+      </p>
     </div>
+    <span class="scope-badge {{ 'green' if is_live else 'cement' }}">
+      <i class="fa-solid {{ 'tower-broadcast' if is_live else 'sliders' }}"></i>
+      {{ 'Live reading' if is_live else 'Custom scenario' }}
+    </span>
+  </div>
 
-    <div class="chart-grid" style="margin-top:18px;">
-      <div class="chart-card">
-        <div class="head"><h3>Disease probabilities</h3><span class="tag">donut</span></div>
-        <div class="chart-frame">
-          <img src="{{ url_for('chart', kind='disease', id=result_id) }}" alt="Disease class probability donut chart">
+  <form method="post" id="sensor-form">
+    <div class="simulator-grid">
+      <article class="panel-card controls-card">
+        <div class="panel-header controls-header">
+          <div>
+            <span class="panel-kicker">SIMULATION INPUTS</span>
+            <h2>Field telemetry</h2>
+          </div>
+          <a class="secondary-button" href="{{ url_for('sensor') }}">
+            <i class="fa-solid fa-rotate-left"></i> Reset to live
+          </a>
         </div>
-      </div>
-      <div class="chart-card">
-        <div class="head"><h3>Yield forecast</h3><span class="tag">gauge</span></div>
-        <div class="chart-frame">
-          <img src="{{ url_for('chart', kind='yield', id=result_id) }}" alt="Yield rate gauge">
+
+        <div class="controls-body">
+          {% for f in fields %}
+          <div class="control-group">
+            <div class="control-heading">
+              <div>
+                <label for="inp-{{ f.name }}">{{ f.label }}</label>
+                <small>{{ f.label }} reading, admissible {{ f.low }}&ndash;{{ f.high }} {{ f.unit }}</small>
+              </div>
+              <output id="lbl-{{ f.name }}" for="inp-{{ f.name }}" data-digits="{{ 1 if f.step < 1 else 0 }}">
+                {{ fmt(values.get(f.name, f.default), 1 if f.step < 1 else 0) }} <small>{{ f.unit }}</small>
+              </output>
+            </div>
+            <input type="range" id="inp-{{ f.name }}" name="{{ f.name }}"
+                   min="{{ f.low }}" max="{{ f.high }}" step="{{ f.step }}"
+                   value="{{ values.get(f.name, f.default) }}"
+                   data-digits="{{ 1 if f.step < 1 else 0 }}">
+            <div class="range-scale">
+              <span>{{ f.low }} {{ f.unit }}</span>
+              <span>{{ f.high }} {{ f.unit }}</span>
+            </div>
+          </div>
+          {% endfor %}
         </div>
-      </div>
-    </div>
-    {% else %}
-    <div class="card"><div class="empty">No model output yet.</div></div>
-    {% endif %}
-  </div>
-</div>
+      </article>
 
-{% if result %}
-<div class="section-title">Reading against agronomic ranges</div>
-<div class="chart-grid">
-  <div class="chart-card">
-    <div class="head"><h3>Profile vs ideal</h3><span class="tag">radar</span></div>
-    <div class="chart-frame">
-      <img src="{{ url_for('chart', kind='radar', id=result_id) }}" alt="Radar chart of sensor profile">
-    </div>
-  </div>
-  <div class="chart-card">
-    <div class="head"><h3>Position in range</h3><span class="tag">bars</span></div>
-    <div class="chart-frame">
-      <img src="{{ url_for('chart', kind='bars', id=result_id) }}" alt="Bar chart of each reading within its range">
-    </div>
-  </div>
-</div>
-
-<div class="section-title">Raw readings</div>
-<div class="card">
-  <div class="stat-list">
-    {% for f in fields %}
-      {% set v = values.get(f.name, f.default) %}
-      {% set pos = (((v - f.low) / (f.high - f.low)) * 100) %}
-      {% set clamped = pos if pos >= 0 and pos <= 100 else (0 if pos < 0 else 100) %}
-      <div class="stat-row">
-        <div class="name">{{ f.label }} <span class="unit">({{ f.unit }})</span></div>
-        <div class="bar-track">
-          <span class="{{ '' if f.low <= v <= f.high else 'bad' }}" style="width: {{ clamped|round(1) }}%"></span>
+      <aside class="panel-card result-card {{ 'green' if result and result.prediction == 'Healthy' else 'amber' }}">
+        <div class="result-topline">
+          <span class="panel-kicker">PREDICTED OUTPUT</span>
+          <span class="live-tag"><i></i> Live</span>
         </div>
-        <div class="val">{{ '%.1f'|format(v) }}</div>
-      </div>
-    {% endfor %}
-  </div>
-</div>
 
-<div class="section-title">How this reading is processed</div>
-<div class="flowchart-wrap">
-  {{ pipeline(active=3) }}
-  <div class="flow-legend">
-    <span>Highlighted stage: the two Random Forest heads applied to this reading.</span>
+        {% if result %}
+        <div class="result-primary">
+          <span>Crop state</span>
+          <strong style="font-size:clamp(26px,3vw,34px);">{{ result.prediction }}</strong>
+        </div>
+
+        <div class="benchmark-block">
+          <div class="benchmark-label">
+            <span>Confidence</span>
+            <strong>{{ pct(result.probabilities[result.prediction]) }}</strong>
+          </div>
+          <div class="progress-track">
+            <span style="width: {{ (result.probabilities[result.prediction] * 100)|round(1) }}%"></span>
+          </div>
+          <div class="benchmark-scale">
+            <span>0%</span><span>classifier</span><span>100%</span>
+          </div>
+        </div>
+
+        <div class="result-detail-grid">
+          <div><span>Yield forecast</span><strong>{{ fmt(result.yield_forecast) }}</strong></div>
+          <div><span>Top risk</span><strong>{{ pct(risk[1]) }}</strong></div>
+        </div>
+        {% endif %}
+
+        <button type="submit" class="primary-button full-button">
+          <i class="fa-solid fa-play"></i> Run the model
+        </button>
+      </aside>
+    </div>
+  </form>
+
+  {% if result %}
+  <div class="overview-visual-grid">
+    <article class="panel-card">
+      <div class="panel-header">
+        <div><span class="panel-kicker">CLASSIFIER</span><h2>Disease split</h2></div>
+        <span class="panel-period">Random Forest</span>
+      </div>
+      {{ donut(disease_items(result.probabilities),
+               center_value=pct(result.probabilities[result.prediction]),
+               center_label=result.prediction) }}
+    </article>
+
+    <article class="panel-card">
+      <div class="panel-header">
+        <div><span class="panel-kicker">REGRESSOR</span><h2>Yield_Rate forecast</h2></div>
+        <span class="panel-period">Random Forest</span>
+      </div>
+      <div class="panel-body">
+        {{ gauge(result.yield_forecast) }}
+      </div>
+    </article>
   </div>
-</div>
-{% endif %}
+
+  <div class="overview-visual-grid">
+    <article class="panel-card">
+      <div class="panel-header">
+        <div><span class="panel-kicker">PROFILE</span><h2>Against ideal range</h2></div>
+        <i class="fa-solid fa-radar panel-header-icon"></i>
+      </div>
+      <div class="panel-body">{{ radar(values, fields) }}</div>
+    </article>
+
+    <article class="panel-card">
+      <div class="panel-header">
+        <div><span class="panel-kicker">RANGE CHECK</span><h2>Position in each range</h2></div>
+        <i class="fa-solid fa-ruler-horizontal panel-header-icon"></i>
+      </div>
+      <div class="panel-body">{{ rangebars(values, fields) }}</div>
+    </article>
+  </div>
+
+  {% set lane = [
+    {'input_label': 'Telemetry', 'input_value': '8 features',
+     'input_icon': 'green', 'input_glyph': 'fa-tower-broadcast', 'input_active': is_live},
+    {'input_label': 'Preprocessing', 'input_value': 'StandardScaler',
+     'input_icon': 'green', 'input_glyph': 'fa-sliders',
+     'process_label': 'Random Forest', 'process_value': '150 trees',
+     'process_icon': 'violet', 'process_glyph': 'fa-brain',
+     'output_label': 'Crop state', 'output_value': result.prediction}
+  ] %}
+  <article class="panel-card">
+    <div class="panel-header">
+      <div><span class="panel-kicker">PROCESS MAP</span><h2>How this reading is processed</h2></div>
+    </div>
+    {{ flow(lane) }}
+  </article>
+  {% endif %}
+
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var ranges = document.querySelectorAll('input[type="range"]');
+  function paint(r) {
+    var min = parseFloat(r.min), max = parseFloat(r.max), val = parseFloat(r.value);
+    var pct = max > min ? ((val - min) / (max - min)) * 100 : 0;
+    r.style.setProperty('--range-progress', pct + '%');
+    var out = document.getElementById('lbl-' + r.name);
+    if (out && out.firstChild) {
+      var digits = parseInt(r.getAttribute('data-digits') || '0', 10);
+      out.firstChild.nodeValue = val.toFixed(digits) + ' ';
+    }
+  }
+  Array.prototype.forEach.call(ranges, function (r) {
+    paint(r);
+    r.addEventListener('input', function () { paint(r); });
+  });
+})();
+</script>
 {% endblock %}

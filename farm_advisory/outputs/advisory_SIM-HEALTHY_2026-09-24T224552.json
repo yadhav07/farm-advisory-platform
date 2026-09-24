@@ -1,67 +1,67 @@
 {
   "crop": "Wheat",
-  "node_id": "SIM-STRESS",
-  "timestamp": "2026-09-23T23:05:02",
+  "node_id": "SIM-HEALTHY",
+  "timestamp": "2026-09-24T22:45:52",
   "sensor": {
-    "Temperature": 23.29,
-    "Humidity": 79.28,
-    "Moisture": 48.65,
-    "Nitrogen": 46.91,
-    "Phosphorus": 41.24,
-    "Potassium": 38.89,
-    "PH": 4.9,
-    "Light_Intensity": 353.6,
+    "Temperature": 22.42,
+    "Humidity": 78.04,
+    "Moisture": 48.3,
+    "Nitrogen": 47.94,
+    "Phosphorus": 41.69,
+    "Potassium": 40.13,
+    "PH": 6.13,
+    "Light_Intensity": 370.0,
     "disease_prediction": "Healthy",
     "disease_probabilities": {
-      "Bacterial_Leaf_Spot": 0.020706916391040674,
-      "Early_Blight": 0.0658718022317471,
-      "Healthy": 0.5273451608461958,
-      "Powdery_Mildew": 0.07608826812375624,
-      "Root_Rot": 0.22293880963991997,
-      "Rust": 0.08704904276734034
+      "Bacterial_Leaf_Spot": 0.013333333333333334,
+      "Early_Blight": 0.00825339464841115,
+      "Healthy": 0.8241106282832581,
+      "Powdery_Mildew": 0.018961851117534984,
+      "Root_Rot": 0.012823748281161531,
+      "Rust": 0.12251704433630095
     },
     "top_disease_risk": {
-      "disease": "Root_Rot",
-      "probability": 0.22293880963991997
+      "disease": "Rust",
+      "probability": 0.12251704433630095
     },
-    "yield_forecast": 42.94
+    "yield_forecast": 45.83
   },
   "weather": {
     "source": "open-meteo",
     "latitude": 28.6139,
     "longitude": 77.209,
-    "observed_at": "2026-09-23T23:00",
-    "temperature": 30.2,
-    "humidity": 61,
+    "observed_at": "2026-09-24T22:30",
+    "temperature": 28.2,
+    "humidity": 70,
     "precipitation_mm": 0.0,
-    "wind_speed_kmh": 4.3,
+    "wind_speed_kmh": 8.7,
     "weather_code": 0,
     "weather_label": "Clear sky",
     "forecast": {
       "dates": [
-        "2026-09-23",
         "2026-09-24",
-        "2026-09-25"
+        "2026-09-25",
+        "2026-09-26"
       ],
       "t_max": [
-        36.9,
-        35.6,
-        34.3
+        34.6,
+        34.4,
+        30.5
       ],
       "t_min": [
-        27.0,
-        26.1,
-        24.9
+        26.2,
+        24.4,
+        24.2
       ],
       "precip_probability": [
         18,
-        20,
-        31
+        43,
+        45
       ],
       "precip_sum": [
+        0.1,
         0.0,
-        0.0,
-        0.1
+        2.0
       ]
     }
   },
@@ -85,13 +85,7 @@
       "category": "Leaf Disease",
       "action": "Pepper Bell Bacterial Spot detected on the leaf image - isolate affected plants, remove infected foliage and apply a registered treatment.",
       "rationale": "Leaf image classifier reports Pepper Bell Bacterial Spot with 87.1% confidence."
-    },
-    {
-      "priority": "Medium",
-      "category": "Soil Amendment",
-      "action": "Apply agricultural lime (~250-400 kg/acre) to raise pH.",
-      "rationale": "Soil pH 4.9 is acidic (below 6.0); nutrients like phosphorus fixate in acidic soil."
     }
   ],
-  "summary": "Action recommended - crop state: Healthy; yield forecast: 42.94; 2 advisory action(s)."
+  "summary": "Action recommended - crop state: Healthy; yield forecast: 45.83; 1 advisory action(s)."
 }

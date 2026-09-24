@@ -1,4 +1,4 @@
-# 🌾 Farm Advisory Platform
+# Farm Advisory Platform
 
 A multi-modal agronomy machine-learning system that combines field telemetry,
 plant imagery and live weather into a single actionable farm advisory — with a
@@ -32,18 +32,55 @@ windows — each with a plain-language rationale, ranked High / Medium / Low.
 pip install numpy pandas scikit-learn joblib matplotlib seaborn pillow torch torchvision flask
 ```
 
-### 2. Run the web UI
+### 2. Run the dashboard
 
 ```bash
 cd farm_advisory
 python app.py
 ```
 
-The browser opens automatically at <http://127.0.0.1:5001> — a chart-driven dashboard with
-live telemetry, disease-probability donuts, a yield gauge, sensor-profile radar and range
-charts, small-multiple telemetry history, weather forecasts, and the pipeline flowchart.
+The browser opens automatically at <http://127.0.0.1:5001>. The server binds to
+`0.0.0.0` so field nodes on the same network can reach it.
 
-### 3. Or run the live CLI pipeline
+Pages: overview, field node, sensor analytics, leaf vision, sky vision, live
+weather, advisory engine.
+
+### 3. Connect an ESP32 field node
+
+The firmware in `hardware/esp32_farm_node/` posts readings to this server:
+
+```json
+POST http://<your-pc-ip>:5001/api/sensor-data
+{
+  "device_id": "FARM_01",
+  "soil_moisture": 44,
+  "air_temperature": 27.3,
+  "humidity": 64.8,
+  "light_intensity": 585.2,
+  "mq135_raw": 1240,
+  "bme_temperature": 26.1,
+  "pressure": 1008.4
+}
+```
+
+Open the **Field node** page, type the ESP32's IP address (for example
+`192.168.1.50`) and press **Connect**. The dashboard lists known nodes, shows
+online/idle state, and the overview then renders that node's live telemetry
+through the Random Forest heads.
+
+| Endpoint | Purpose |
+| :--- | :--- |
+| `POST /api/sensor-data` | ingest a firmware payload, returns crop state and yield forecast |
+| `GET /api/devices` | known nodes with IP, last reading and online state |
+| `GET /api/latest` | latest reading mapped to the 8-feature model schema |
+
+Four features map straight from the hardware (temperature, humidity, moisture,
+light). `ph`, `nitrogen`, `phosphorus` and `potassium` are **estimated** from soil
+moisture and the MQ-135 reading until those probes are fitted; send them in the
+payload and they are used verbatim instead. The UI labels each value as
+measured or estimated.
+
+### 4. Or run the live CLI pipeline
 
 ```bash
 cd farm_advisory
@@ -53,7 +90,7 @@ python app.py --cli --leaf "C:/leaf.jpg" --sky "C:/sky.jpg"
 python app.py --cli --offline          # use cached weather, no API call
 ```
 
-### 4. Retrain from scratch (optional)
+### 5. Retrain from scratch (optional)
 
 Trained weights are committed, so this is only needed to reproduce them:
 
@@ -89,15 +126,18 @@ Multidisciplinary_Project/
 │   ├── config.py              # paths, farm location, thresholds, delivery settings
 │   ├── weather_feed.py        # live weather (Open-Meteo, cached, offline-safe)
 │   ├── iot_ingestion.py       # telemetry validation + simulated sensor node
+│   ├── device_ingest.py       # ESP32 field-node ingestion and device registry
 │   ├── recommendation_engine.py
 │   ├── delivery.py            # markdown/JSON reports, optional email/Telegram
 │   ├── app.py                 # entry point: web UI (default) or --cli pipeline
 │   ├── dataset/, outputs/
 │   └── test.py
 ├── web_ui/                    # Flask dashboard
-│   ├── app.py, charts.py, model_service.py
+│   ├── app.py, viz.py, model_service.py
 │   ├── templates/, static/
 │   └── README.md
+├── hardware/
+│   └── esp32_farm_node/       # ESP32 firmware (posts + serves readings)
 └── project_architecture.md    # full technical specification
 ```
 

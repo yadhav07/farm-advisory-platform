@@ -2,61 +2,161 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Farm Advisory Platform{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Farm Advisory{% endblock %}</title>
+  <meta name="description" content="Farm advisory workspace: live field-node telemetry, disease and yield models, and ranked agronomic actions.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<div class="app">
+<div class="app-shell">
 
-  <aside class="sidebar">
-    <div class="logo">🌾<span>Farm Advisory<br>Platform</span></div>
+  <aside class="sidebar" aria-label="Primary navigation">
+    <div class="sidebar-brand">
+      <span class="brand-mark"><i class="fa-solid fa-seedling"></i></span>
+      <div>
+        <strong>FarmIQ</strong>
+        <span>Advisory workspace</span>
+      </div>
+    </div>
 
-    <div class="group-label">Monitor</div>
-    <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}">
-      <span class="ico">📊</span> Overview
-    </a>
-    <a href="{{ url_for('weather') }}" class="{{ 'active' if request.endpoint == 'weather' }}">
-      <span class="ico">⛅</span> Live Weather
-    </a>
+    <div class="nav-label">Workspace</div>
+    <nav class="sidebar-nav">
+      <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'index' }}" href="{{ url_for('index') }}">
+        <span class="nav-icon nav-icon-total"><i class="fa-solid fa-chart-pie"></i></span>
+        <span class="nav-copy">
+          <strong>Total overview</strong>
+          <small>Live telemetry &amp; models</small>
+        </span>
+        <i class="fa-solid fa-chevron-right nav-arrow"></i>
+      </a>
+      <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'device' }}" href="{{ url_for('device') }}">
+        <span class="nav-icon nav-icon-power"><i class="fa-solid fa-microchip"></i></span>
+        <span class="nav-copy">
+          <strong>Field node</strong>
+          <small>ESP32 connection</small>
+        </span>
+        <i class="fa-solid fa-chevron-right nav-arrow"></i>
+      </a>
+      <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'advisory' }}" href="{{ url_for('advisory') }}">
+        <span class="nav-icon nav-icon-cement"><i class="fa-solid fa-lightbulb"></i></span>
+        <span class="nav-copy">
+          <strong>Advisory</strong>
+          <small>Ranked actions</small>
+        </span>
+        <i class="fa-solid fa-chevron-right nav-arrow"></i>
+      </a>
+    </nav>
 
-    <div class="group-label">Models</div>
-    <a href="{{ url_for('sensor') }}" class="{{ 'active' if request.endpoint == 'sensor' }}">
-      <span class="ico">📡</span> Sensor Analytics
-    </a>
-    <a href="{{ url_for('leaf') }}" class="{{ 'active' if request.endpoint == 'leaf' }}">
-      <span class="ico">🍃</span> Leaf Vision
-    </a>
-    <a href="{{ url_for('satellite') }}" class="{{ 'active' if request.endpoint == 'satellite' }}">
-      <span class="ico">🛰️</span> Sky Vision
-    </a>
+    <div class="nav-label">Models</div>
+    <nav class="sidebar-nav">
+      <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'sensor' }}" href="{{ url_for('sensor') }}">
+        <span class="nav-icon nav-icon-total"><i class="fa-solid fa-tower-broadcast"></i></span>
+        <span class="nav-copy">
+          <strong>Sensor model</strong>
+          <small>Disease &amp; yield</small>
+        </span>
+        <i class="fa-solid fa-chevron-right nav-arrow"></i>
+      </a>
+      <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'leaf' }}" href="{{ url_for('leaf') }}">
+        <span class="nav-icon nav-icon-cement"><i class="fa-solid fa-leaf"></i></span>
+        <span class="nav-copy">
+          <strong>Leaf vision</strong>
+          <small>EfficientNet-B0</small>
+        </span>
+        <i class="fa-solid fa-chevron-right nav-arrow"></i>
+      </a>
+      <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'satellite' }}" href="{{ url_for('satellite') }}">
+        <span class="nav-icon nav-icon-power"><i class="fa-solid fa-cloud-sun"></i></span>
+        <span class="nav-copy">
+          <strong>Sky vision</strong>
+          <small>Weather-state CNN</small>
+        </span>
+        <i class="fa-solid fa-chevron-right nav-arrow"></i>
+      </a>
+      <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'weather' }}" href="{{ url_for('weather') }}">
+        <span class="nav-icon nav-icon-violet"><i class="fa-solid fa-wind"></i></span>
+        <span class="nav-copy">
+          <strong>Live weather</strong>
+          <small>Open-Meteo feed</small>
+        </span>
+        <i class="fa-solid fa-chevron-right nav-arrow"></i>
+      </a>
+    </nav>
 
-    <div class="group-label">Decision</div>
-    <a href="{{ url_for('advisory') }}" class="{{ 'active' if request.endpoint == 'advisory' }}">
-      <span class="ico">🧠</span> Advisory Engine
-    </a>
+    <div class="sidebar-spacer"></div>
 
-    <div class="foot">
-      Random Forest · EfficientNet-B0 · Weather CNN<br>
-      Flask dashboard
+    {% if live %}
+      {% if live.source == 'device' and live.online %}
+        <div class="model-status-card">
+          <span class="status-icon live"><i class="fa-solid fa-circle-check"></i></span>
+          <div>
+            <strong>{{ live.device_id }} online</strong>
+            <span>{{ live.timestamp[11:19] }} UTC &middot; {{ live.source_ip or 'LAN' }}</span>
+          </div>
+        </div>
+      {% elif live.source == 'device' %}
+        <div class="model-status-card">
+          <span class="status-icon idle"><i class="fa-solid fa-clock"></i></span>
+          <div>
+            <strong>{{ live.device_id }} idle</strong>
+            <span>last seen {{ live.timestamp[11:19] }} UTC</span>
+          </div>
+        </div>
+      {% else %}
+        <div class="model-status-card">
+          <span class="status-icon idle"><i class="fa-solid fa-flask"></i></span>
+          <div>
+            <strong>Simulated node</strong>
+            <span>no field node reporting</span>
+          </div>
+        </div>
+      {% endif %}
+    {% endif %}
+
+    <div class="sidebar-user">
+      <span class="user-avatar">FA</span>
+      <div class="user-meta">
+        <strong>{{ live.device_id if live else 'Farm node' }}</strong>
+        <span>{{ 'Field telemetry' if live and live.source == 'device' else 'Simulation' }}</span>
+      </div>
     </div>
   </aside>
 
-  <div class="main">
+  <main class="main-shell">
     <header class="topbar">
-      <div>
-        <h1>{% block heading %}Farm Advisory Platform{% endblock %}</h1>
-        <p class="sub">{% block subheading %}{% endblock %}</p>
+      <div class="breadcrumbs">
+        <span>Farm operations</span>
+        <i class="fa-solid fa-chevron-right"></i>
+        <strong>{% block crumb %}Overview{% endblock %}</strong>
       </div>
-      <div>{% block topbar_right %}{% endblock %}</div>
+      <div class="topbar-actions">
+        {% if live %}
+          {% if live.source == 'device' %}
+            <span class="live-status"><span></span> {{ live.device_id }} live</span>
+          {% else %}
+            <span class="live-status idle"><span></span> simulated node</span>
+          {% endif %}
+        {% endif %}
+      </div>
     </header>
 
-    <div class="content">
-      {% if error %}<div class="alert error"><span>⚠️</span><span>{{ error }}</span></div>{% endif %}
+    <div class="content-wrap">
+      {% if error %}<div class="alert error"><i class="fa-solid fa-triangle-exclamation"></i><span>{{ error }}</span></div>{% endif %}
       {% block content %}{% endblock %}
+
+      <footer class="app-footer">
+        <span>FarmIQ advisory workspace</span>
+        <span>Random Forest &middot; EfficientNet-B0 &middot; Weather CNN &middot; Flask</span>
+      </footer>
     </div>
-  </div>
+  </main>
 
 </div>
+
+{% block scripts %}{% endblock %}
 </body>
 </html>

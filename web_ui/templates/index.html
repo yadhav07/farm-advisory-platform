@@ -1,127 +1,247 @@
 {% extends "base.html" %}
-{% from "_flowchart.html" import pipeline %}
+{% from "_charts.html" import donut, gauge, radar, sparkgrid, forecast, flow %}
 
-{% block title %}Overview · Farm Advisory Platform{% endblock %}
-{% block heading %}Farm Overview{% endblock %}
-{% block subheading %}Live telemetry streamed from the simulated IoT node, run through the trained models{% endblock %}
-
-{% block topbar_right %}
-  {% if reading %}<span class="live-pill"><span class="dot"></span>live · node {{ reading.node_id }}</span>{% endif %}
-{% endblock %}
+{% block title %}Overview · FarmIQ{% endblock %}
+{% block crumb %}Total overview{% endblock %}
 
 {% block content %}
+<section class="view">
 
-{% if result %}
-<div class="kpi-grid">
-  <div class="kpi {{ '' if result.prediction == 'Healthy' else 'red' }}">
-    <div class="label">Crop state</div>
-    <div class="value">{{ result.prediction }}</div>
-    <div class="sub">Random Forest · {{ (result.probabilities[result.prediction] * 100)|round(1) }}% confidence</div>
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">TOTAL OVERVIEW</p>
+      <h1>One clear view of your field.</h1>
+      <p>
+        {% if live and live.source == 'device' %}
+          Live telemetry from <strong>{{ live.device_id }}</strong>
+          {%- if live.source_ip %} ({{ live.source_ip }}){% endif %} runs through the disease
+          classifier and the yield regressor on every reading.
+        {% else %}
+          A simulated node is driving the dashboard. Connect an ESP32 on the
+          <strong>Field node</strong> page to replace it with real hardware readings.
+        {% endif %}
+      </p>
+    </div>
+    <div class="heading-note">
+      <i class="fa-solid fa-clock-rotate-left"></i>
+      <span>
+        <strong>{{ telemetry|length }} readings in view</strong>
+        {% if live %}{{ live.timestamp[11:19] }} UTC{% endif %}
+      </span>
+    </div>
   </div>
 
-  <div class="kpi blue">
-    <div class="label">Yield_Rate forecast</div>
-    <div class="value">{{ result.yield_forecast }}</div>
-    <div class="sub">Random Forest regressor · 10–100</div>
-  </div>
+  {% if result %}
+  <div class="metric-grid">
+    <article class="metric-card metric-card-total">
+      <div class="metric-topline">
+        <span>Crop state</span>
+        <span class="metric-icon metric-icon-total"><i class="fa-solid fa-wheat-awn"></i></span>
+      </div>
+      <strong class="metric-value" style="font-size:clamp(21px,2vw,27px);">{{ result.prediction }}</strong>
+      <p>{{ pct(result.probabilities[result.prediction]) }} classifier confidence</p>
+    </article>
 
-  <div class="kpi {{ 'amber' if top_risk[1] >= 0.25 else '' }}">
-    <div class="label">Top disease risk</div>
-    <div class="value">{{ (top_risk[1] * 100)|round(1) }}%</div>
-    <div class="sub">{{ top_risk[0].replace('_', ' ') if top_risk[0] else '—' }}</div>
-  </div>
+    <article class="metric-card">
+      <div class="metric-topline">
+        <span>Yield_Rate forecast</span>
+        <span class="metric-icon metric-icon-save"><i class="fa-solid fa-seedling"></i></span>
+      </div>
+      <strong class="metric-value">{{ fmt(result.yield_forecast) }} <small>/ 100</small></strong>
+      <p>Random Forest regressor</p>
+    </article>
 
-  {% if weather %}
-  <div class="kpi teal">
-    <div class="label">Weather now</div>
-    <div class="value">{{ weather.temperature }}°C</div>
-    <div class="sub">{{ weather.weather_label }} · {{ weather.humidity }}% RH · wind {{ weather.wind_speed_kmh }} km/h</div>
+    <article class="metric-card metric-card-amber">
+      <div class="metric-topline">
+        <span>Top disease risk</span>
+        <span class="metric-icon metric-icon-amber"><i class="fa-solid fa-triangle-exclamation"></i></span>
+      </div>
+      <strong class="metric-value">{{ pct(risk[1]) }}</strong>
+      <p>{{ risk[0].replace('_', ' ') if risk[0] else 'No elevated risk' }}</p>
+    </article>
+
+    {% if weather %}
+    <article class="metric-card metric-card-blue">
+      <div class="metric-topline">
+        <span>Field weather</span>
+        <span class="metric-icon metric-icon-blue"><i class="fa-solid fa-cloud-sun"></i></span>
+      </div>
+      <strong class="metric-value">{{ fmt(weather.temperature) }}<small>&deg;C</small></strong>
+      <p>{{ weather.weather_label }} &middot; {{ weather.humidity }}% RH</p>
+    </article>
+    {% else %}
+    <article class="metric-card metric-card-saving">
+      <div class="metric-topline">
+        <span>Soil moisture</span>
+        <span class="metric-icon metric-icon-save"><i class="fa-solid fa-droplet"></i></span>
+      </div>
+      <strong class="metric-value">{{ fmt(values.Moisture) }}<small>%</small></strong>
+      <p>volumetric water content</p>
+    </article>
+    {% endif %}
   </div>
   {% endif %}
 
-  <div class="kpi purple">
-    <div class="label">Telemetry</div>
-    <div class="value">{{ reading.timestamp[11:16] }}</div>
-    <div class="sub">{{ reading.crop }} · reading captured now</div>
-  </div>
-</div>
+  {% if result %}
+  {% set lane_model = [
+    {'input_label': 'Field telemetry', 'input_value': live.device_id,
+     'input_icon': 'green', 'input_glyph': 'fa-tower-broadcast', 'input_active': live.source == 'device',
+     'process_label': 'Random Forest', 'process_value': '8 features',
+     'process_icon': 'violet', 'process_glyph': 'fa-brain',
+     'output_label': 'Crop state', 'output_value': result.prediction},
+    {'input_label': 'Yield target', 'input_value': 'regression head',
+     'input_icon': 'green', 'input_glyph': 'fa-arrow-trend-up',
+     'process_label': 'Random Forest', 'process_value': 'continuous',
+     'process_icon': 'violet', 'process_glyph': 'fa-gauge-high',
+     'output_label': 'Yield forecast', 'output_value': fmt(result.yield_forecast, 1)}
+  ] %}
+  {% if weather %}
+  {% set _ = lane_model.append(
+    {'input_label': 'Open-Meteo', 'input_value': weather.weather_label,
+     'input_icon': 'power', 'input_glyph': 'fa-wind', 'input_active': true,
+     'process_label': 'Rule engine', 'process_value': 'thresholds',
+     'process_icon': 'cement', 'process_glyph': 'fa-list-check',
+     'output_label': 'Advisory', 'output_value': 'live'}) %}
+  {% endif %}
 
-<div class="section-title">Model output</div>
-<div class="chart-grid">
-  <div class="chart-card">
-    <div class="head"><h3>Disease probability distribution</h3><span class="tag">rf_model.joblib</span></div>
-    <div class="chart-frame">
-      <img src="{{ url_for('chart', kind='disease', id=result_id) }}" alt="Donut chart of disease class probabilities">
+  <div class="overview-visual-grid">
+    <article class="panel-card donut-card">
+      <div class="panel-header">
+        <div>
+          <span class="panel-kicker">CURRENT READING</span>
+          <h2>Disease probability split</h2>
+        </div>
+        <span class="panel-period">Live</span>
+      </div>
+      {{ donut(disease_items(result.probabilities),
+               center_value=pct(result.probabilities[result.prediction]),
+               center_label=result.prediction) }}
+    </article>
+
+    <article class="panel-card flow-card">
+      <div class="panel-header">
+        <div>
+          <span class="panel-kicker">SIGNAL FLOW</span>
+          <h2>From field inputs to model output</h2>
+        </div>
+        <i class="fa-solid fa-diagram-project panel-header-icon"></i>
+      </div>
+      {{ flow(lane_model) }}
+    </article>
+  </div>
+
+  <article class="panel-card">
+    <div class="panel-header trend-header">
+      <div>
+        <span class="panel-kicker">TELEMETRY HISTORY</span>
+        <h2>Every reading, one screen</h2>
+      </div>
+      <div class="chart-controls">
+        <span class="chart-legend-inline"><i class="cement"></i> Temperature</span>
+        <span class="chart-legend-inline"><i class="power"></i> Humidity</span>
+        <span class="chart-legend-inline"><i class="green"></i> Soil &amp; nutrients</span>
+      </div>
     </div>
-  </div>
-
-  <div class="chart-card">
-    <div class="head"><h3>Yield_Rate forecast</h3><span class="tag">regressor</span></div>
-    <div class="chart-frame">
-      <img src="{{ url_for('chart', kind='yield', id=result_id) }}" alt="Gauge showing the predicted yield rate">
+    <div class="panel-body">
+      {{ sparkgrid(telemetry) }}
     </div>
-  </div>
-</div>
+  </article>
 
-<div class="section-title">Sensor telemetry &amp; environment</div>
-<div class="chart-grid">
-  <div class="chart-card">
-    <div class="head"><h3>Sensor profile vs ideal range</h3><span class="tag">8 features</span></div>
-    <div class="chart-frame">
-      <img src="{{ url_for('chart', kind='radar', id=result_id) }}" alt="Radar chart comparing the reading to the ideal range">
+  <article class="panel-card">
+    <div class="panel-header">
+      <div>
+        <span class="panel-kicker">FIELD CONDITIONS</span>
+        <h2>Forecast and sensor profile</h2>
+      </div>
+      <i class="fa-solid fa-cloud-sun panel-header-icon"></i>
     </div>
-  </div>
-
-  <div class="chart-card">
-    <div class="head"><h3>3-day weather forecast</h3><span class="tag">Open-Meteo</span></div>
-    <div class="chart-frame">
-      <img src="{{ url_for('chart', kind='forecast', id=result_id) }}" alt="Three day weather forecast">
+    <div class="panel-body">
+      <div class="split-2">
+        <div>{{ radar(values, fields) }}</div>
+        <div>{{ forecast(forecast_rows) }}</div>
+      </div>
     </div>
-  </div>
-</div>
+  </article>
 
-<div class="section-title">Logged telemetry history</div>
-<div class="chart-card">
-  <div class="head"><h3>Recent sensor readings over time</h3><span class="tag">farm_advisory/dataset/sensor_log.csv</span></div>
-  <div class="chart-frame">
-    <img src="{{ url_for('chart', kind='telemetry') }}" alt="Time series of logged temperature, humidity, moisture, nutrients, pH and light">
-  </div>
-</div>
+  <div class="overview-bottom-grid" style="margin-top:16px;">
+    <article class="panel-card">
+      <div class="panel-header history-header">
+        <div>
+          <span class="panel-kicker">READING HISTORY</span>
+          <h2>Last logged telemetry</h2>
+        </div>
+        <span class="panel-period">{{ telemetry|length }} rows</span>
+      </div>
+      <div class="table-wrap history-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Reading</th>
+              <th class="table-num">Temp</th>
+              <th class="table-num">Humidity</th>
+              <th class="table-num">Moisture</th>
+              <th class="table-num">Nitrogen</th>
+              <th class="table-num">pH</th>
+              <th class="table-num">Light</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in telemetry[-12:]|reverse %}
+            <tr>
+              <td class="table-batch">
+                <strong>#{{ loop.index }}</strong>
+                <small>{{ live.device_id if live else 'SIM' }}</small>
+              </td>
+              <td class="table-num table-cement">{{ fmt(row.Temperature) }}&deg;C</td>
+              <td class="table-num table-power">{{ fmt(row.Humidity) }}%</td>
+              <td class="table-num">{{ fmt(row.Moisture) }}%</td>
+              <td class="table-num">{{ fmt(row.Nitrogen, 1) }}</td>
+              <td class="table-num">{{ fmt(row.PH) }}</td>
+              <td class="table-num">{{ fmt(row.Light_Intensity, 0) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="table-empty">No telemetry logged yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
 
-<div class="section-title">System pipeline</div>
-<div class="flowchart-wrap">
-  {{ pipeline() }}
-  <div class="flow-legend">
-    <span><i style="background:#2e7d32"></i> inputs</span>
-    <span><i style="background:#00838f"></i> preprocessing</span>
-    <span><i style="background:#1565c0"></i> models</span>
-    <span><i style="background:#5e35b1"></i> fusion</span>
-    <span><i style="background:#c62828"></i> output</span>
+    <article class="panel-card">
+      <div class="panel-header">
+        <div>
+          <span class="panel-kicker">READING SUMMARY</span>
+          <h2>Range across history</h2>
+        </div>
+        <i class="fa-solid fa-chart-simple panel-header-icon"></i>
+      </div>
+      <div class="saved-list">
+        {% for s in history_stats(telemetry, fields) %}
+        <div class="saved-item">
+          <div class="saved-item-top">
+            <span class="saved-item-user">
+              <span><i class="fa-solid fa-gauge"></i></span> {{ s.label }}
+            </span>
+            <time>mean {{ fmt(s.mean, 1) }} {{ s.unit }}</time>
+          </div>
+          <div class="rangebar-track" style="margin-top:10px;">
+            <span class="rangebar-ideal"></span>
+            <span class="rangebar-value {{ '' if in_range(s.mean, s.low, s.high) else 'bad' }}"
+                  style="width: {{ bar_position(s.mean, s.low, s.high)|round(1) }}%"></span>
+          </div>
+          <div class="saved-item-metrics">
+            <span>min<strong>{{ fmt(s.min, 1) }}</strong></span>
+            <span>max<strong>{{ fmt(s.max, 1) }}</strong></span>
+            <span>range<strong>{{ s.low }}&ndash;{{ s.high }}</strong></span>
+          </div>
+        </div>
+        {% else %}
+        <div class="empty">No readings to summarise yet.</div>
+        {% endfor %}
+      </div>
+    </article>
   </div>
-</div>
-{% endif %}
+  {% endif %}
 
-<div class="section-title">Tools</div>
-<div class="tool-grid">
-  <a class="tool" href="{{ url_for('sensor') }}">
-    <div class="ico">📡</div>
-    <h3>Sensor Analytics</h3>
-    <p>Enter a custom reading and inspect disease probabilities, yield and range charts.</p>
-  </a>
-  <a class="tool" href="{{ url_for('leaf') }}">
-    <div class="ico">🍃</div>
-    <h3>Leaf Vision</h3>
-    <p>Upload a leaf photo for EfficientNet-B0 diagnosis with a confidence donut.</p>
-  </a>
-  <a class="tool" href="{{ url_for('satellite') }}">
-    <div class="ico">🛰️</div>
-    <h3>Sky Vision</h3>
-    <p>Classify cloud / rain / shine / sunrise from a field photograph.</p>
-  </a>
-  <a class="tool" href="{{ url_for('advisory') }}">
-    <div class="ico">🧠</div>
-    <h3>Advisory Engine</h3>
-    <p>Fuse every signal into ranked actions and download the full report.</p>
-  </a>
-</div>
+</section>
 {% endblock %}

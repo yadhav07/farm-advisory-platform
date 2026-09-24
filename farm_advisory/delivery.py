@@ -31,7 +31,7 @@ if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 
-PRIORITY_ICON = {'High': '🔴', 'Medium': '🟠', 'Low': '🟡'}
+PRIORITY_ORDER = {'High': 0, 'Medium': 1, 'Low': 2}
 
 
 def _fmt_float(value, digits=1):
@@ -47,7 +47,7 @@ def format_markdown(analysis):
     """Render the analysis dict as a readable markdown report."""
     ts = analysis.get('timestamp', dt.datetime.now().isoformat(timespec='seconds'))
     lines = []
-    lines.append(f'# 🌾 Farm Advisory Report — {analysis.get("crop", "Crop")}')
+    lines.append(f'# Farm Advisory Report — {analysis.get("crop", "Crop")}')
     lines.append('')
     lines.append(f'> Generated: {ts}  ·  Node: `{analysis.get("node_id", "-")}`')
     lines.append('')
@@ -118,13 +118,12 @@ def format_markdown(analysis):
     lines.append('')
     recs = analysis.get('recommendations', [])
     if not recs:
-        lines.append('✅ No urgent actions required — keep the current management plan.')
+        lines.append('No urgent actions required — keep the current management plan.')
     else:
         lines.append('| Priority | Category | Action | Rationale |')
         lines.append('| --- | --- | --- | --- |')
         for rec in recs:
-            icon = PRIORITY_ICON.get(rec['priority'], '⚪')
-            lines.append(f'| {icon} {rec["priority"]} | {rec["category"]} | '
+            lines.append(f'| {rec["priority"]} | {rec["category"]} | '
                          f'{rec["action"]} | {rec["rationale"]} |')
     lines.append('')
     lines.append('---')
@@ -190,10 +189,9 @@ class ReportDelivery:
         cfg = self.config.get('telegram', {})
         if not cfg.get('enabled') or not cfg.get('bot_token') or not cfg.get('chat_id'):
             return None
-        text_lines = [f"🌾 Farm Advisory ({analysis['node_id']}):\n{analysis['summary']}"]
+        text_lines = [f"Farm Advisory ({analysis['node_id']}):\n{analysis['summary']}"]
         for rec in analysis.get('recommendations', [])[:5]:
-            icon = PRIORITY_ICON.get(rec['priority'], '•')
-            text_lines.append(f"{icon} [{rec['priority']}] {rec['action']}")
+            text_lines.append(f"[{rec['priority']}] {rec['action']}")
         text = '\n'.join(text_lines)
         url = f"https://api.telegram.org/bot{cfg['bot_token']}/sendMessage"
         payload = urllib.parse.urlencode({'chat_id': cfg['chat_id'], 'text': text}).encode()
