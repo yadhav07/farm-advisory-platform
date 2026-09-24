@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Live Weather · Farm Advisory Platform{% endblock %}
+{% block content %}
+<h1>⛅ Live Weather Feed</h1>
+<p class="subtitle">Current conditions and a 3-day forecast from Open-Meteo for any farm location (decimal lat / lon).</p>
+
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+
+<div class="card">
+  <form method="post">
+    <div class="field-row">
+      <div>
+        <label class="field-label" for="latitude">Latitude</label>
+        <input type="number" id="latitude" name="latitude" step="0.0001" min="-90" max="90"
+               value="{{ latitude }}">
+      </div>
+      <div>
+        <label class="field-label" for="longitude">Longitude</label>
+        <input type="number" id="longitude" name="longitude" step="0.0001" min="-180" max="180"
+               value="{{ longitude }}">
+      </div>
+    </div>
+    <div style="margin-top: 14px;">
+      <button type="submit">Fetch Live Weather</button>
+    </div>
+  </form>
+</div>
+
+{% if snapshot %}
+<div class="card">
+  <h2>Current Conditions <span style="color: var(--muted); font-weight: 400; font-size: 0.9rem;">({{ snapshot.latitude }}, {{ snapshot.longitude }})</span></h2>
+  <div class="kpi-row">
+    <div class="kpi"><div class="value">{{ snapshot.weather_label }}</div><div class="label">condition</div></div>
+    <div class="kpi"><div class="value">{{ snapshot.temperature }}°C</div><div class="label">temperature</div></div>
+    <div class="kpi"><div class="value">{{ snapshot.humidity }}%</div><div class="label">relative humidity</div></div>
+    <div class="kpi"><div class="value">{{ snapshot.precipitation_mm }} mm</div><div class="label">precipitation</div></div>
+    <div class="kpi"><div class="value">{{ snapshot.wind_speed_kmh }} km/h</div><div class="label">wind speed</div></div>
+  </div>
+  <p style="color: var(--muted); font-size: 0.86rem;">
+    observed {{ snapshot.observed_at }} · source: {{ snapshot.source }}
+  </p>
+</div>
+
+{% if forecast_rows %}
+<div class="card">
+  <h2>3-Day Forecast</h2>
+  <table>
+    <thead>
+      <tr><th>Date</th><th>Min</th><th>Max</th><th>Precip. probability</th><th>Precip. sum</th></tr>
+    </thead>
+    <tbody>
+      {% for row in forecast_rows %}
+      <tr>
+        <td>{{ row.date }}</td>
+        <td>{{ row.t_min }}°C</td>
+        <td>{{ row.t_max }}°C</td>
+        <td>{{ row.precip_prob }}%</td>
+        <td>{{ row.precip_sum }} mm</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% elif not error %}
+<div class="card"><p style="color: var(--muted); margin: 0;">No snapshot available yet — submit the form to fetch live weather.</p></div>
+{% endif %}
+{% endblock %}

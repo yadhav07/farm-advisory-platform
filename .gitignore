@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Web UI runtime uploads
+web_ui/uploads/
+
+# Runtime caches & logs
+farm_advisory/dataset/weather_cache.json
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

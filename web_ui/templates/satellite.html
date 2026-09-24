@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Weather-State Vision · Farm Advisory Platform{% endblock %}
+{% block content %}
+<h1>🛰️ Weather-State Vision</h1>
+<p class="subtitle">Upload a sky or field photo. The CNN classifies the weather state into cloud, rain, shine or sunrise.</p>
+
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+
+<div class="card">
+  <form method="post" enctype="multipart/form-data">
+    <label class="field-label" for="image">Sky / field photo</label>
+    <input type="file" id="image" name="image" accept="image/*" required>
+    <div class="field-hint">PNG, JPG, JPEG, WebP or BMP</div>
+    <div style="margin-top: 14px;">
+      <button type="submit">Classify Weather State</button>
+    </div>
+  </form>
+</div>
+
+{% if result %}
+<div class="card">
+  <h2>Classification</h2>
+  <div class="result-hero">
+    <div>
+      <div class="big">{{ result.prediction }}</div>
+      <div style="color: var(--muted); font-size: 0.9rem;">
+        confidence {{ (result.probability * 100)|round(1) }}%
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin-top: 22px;">Class probabilities</h3>
+  <table>
+    <thead><tr><th>Weather state</th><th>Probability</th></tr></thead>
+    <tbody>
+      {% for item in result.topk %}
+      <tr>
+        <td>{{ item.class }}</td>
+        <td>
+          <div class="prob-bar"><span style="width: {{ (item.probability * 100)|round(1) }}%"></span></div>
+          <small>{{ (item.probability * 100)|round(1) }}%</small>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

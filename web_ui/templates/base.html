@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Farm Advisory Platform{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('index') }}">🌾 Farm Advisory Platform</a>
+    <nav>
+      <a href="{{ url_for('index') }}">Dashboard</a>
+      <a href="{{ url_for('sensor') }}">Sensor</a>
+      <a href="{{ url_for('leaf') }}">Leaf</a>
+      <a href="{{ url_for('satellite') }}">Satellite</a>
+      <a href="{{ url_for('weather') }}">Weather</a>
+      <a href="{{ url_for('advisory') }}" class="nav-cta">Full Advisory</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    Multi-disciplinary Agronomy ML · sensor + leaf + satellite vision + live weather + advisory delivery
+  </footer>
+</body>
+</html>

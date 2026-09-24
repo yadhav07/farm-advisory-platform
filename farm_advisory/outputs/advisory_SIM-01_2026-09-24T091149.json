@@ -1,0 +1,72 @@
+{
+  "crop": "Wheat",
+  "node_id": "SIM-01",
+  "timestamp": "2026-09-24T09:11:49",
+  "sensor": {
+    "Temperature": 21.8,
+    "Humidity": 76.43,
+    "Moisture": 48.47,
+    "Nitrogen": 47.93,
+    "Phosphorus": 41.78,
+    "Potassium": 37.9,
+    "PH": 6.65,
+    "Light_Intensity": 372.2,
+    "disease_prediction": "Healthy",
+    "disease_probabilities": {
+      "Bacterial_Leaf_Spot": 0.013333333333333334,
+      "Early_Blight": 0.004112545783274037,
+      "Healthy": 0.8335043149126183,
+      "Powdery_Mildew": 0.020999855132494527,
+      "Root_Rot": 0.006157081614494864,
+      "Rust": 0.12189286922378476
+    },
+    "top_disease_risk": {
+      "disease": "Rust",
+      "probability": 0.12189286922378476
+    },
+    "yield_forecast": 46.37
+  },
+  "weather": {
+    "source": "open-meteo",
+    "latitude": 28.6139,
+    "longitude": 77.209,
+    "observed_at": "2026-09-24T09:00",
+    "temperature": 28.3,
+    "humidity": 78,
+    "precipitation_mm": 0.0,
+    "wind_speed_kmh": 8.9,
+    "weather_code": 0,
+    "weather_label": "Clear sky",
+    "forecast": {
+      "dates": [
+        "2026-09-24",
+        "2026-09-25",
+        "2026-09-26"
+      ],
+      "t_max": [
+        33.6,
+        33.3,
+        30.2
+      ],
+      "t_min": [
+        25.6,
+        24.0,
+        24.9
+      ],
+      "precip_probability": [
+        2,
+        31,
+        73
+      ],
+      "precip_sum": [
+        0.0,
+        0.2,
+        4.3
+      ]
+    }
+  },
+  "leaf": null,
+  "sky": null,
+  "recommendations": [],
+  "summary": "Farm is healthy - crop state: Healthy; yield forecast: 46.37; 0 advisory action(s)."
+}

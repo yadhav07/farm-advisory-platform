@@ -1,0 +1,18 @@
+# Normalize text files, keep binaries untouched
+* text=auto
+
+# Trained model artifacts - never apply line-ending translation
+*.pth binary
+*.joblib binary
+*.pkl binary
+
+# Images
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.bmp binary
+
+# Datasets
+*.csv text
+*.json text

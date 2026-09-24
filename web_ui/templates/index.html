@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · Farm Advisory Platform{% endblock %}
+{% block content %}
+<h1>🌾 Farm Advisory Platform</h1>
+<p class="subtitle">A multi-disciplinary agronomy ML system — sensor telemetry, leaf and satellite vision, live weather, and automated farm advisories.</p>
+
+<div class="grid">
+  <a class="tile" href="{{ url_for('sensor') }}">
+    <div class="emoji">📡</div>
+    <h3>Sensor Diagnosis &amp; Yield</h3>
+    <p>Random Forest disease classifier + yield regressor from an 8-feature soil/air reading.</p>
+  </a>
+
+  <a class="tile" href="{{ url_for('leaf') }}">
+    <div class="emoji">🍃</div>
+    <h3>Leaf Disease Detection</h3>
+    <p>EfficientNet-B0 CNN — upload a leaf photo and get an instant disease diagnosis.</p>
+  </a>
+
+  <a class="tile" href="{{ url_for('satellite') }}">
+    <div class="emoji">🛰️</div>
+    <h3>Weather-State Vision</h3>
+    <p>Image CNN that classifies the sky/field state: cloud, rain, shine or sunrise.</p>
+  </a>
+
+  <a class="tile" href="{{ url_for('weather') }}">
+    <div class="emoji">⛅</div>
+    <h3>Live Weather Feed</h3>
+    <p>Current conditions + 3-day forecast from Open-Meteo, cached and offline-safe.</p>
+  </a>
+
+  <a class="tile" href="{{ url_for('advisory') }}">
+    <div class="emoji">🧠</div>
+    <h3>Full Farm Advisory</h3>
+    <p>Fuse sensor + optional photos + live weather into prioritized, actionable recommendations.</p>
+  </a>
+</div>
+{% endblock %}

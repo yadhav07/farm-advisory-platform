@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Full Farm Advisory · Farm Advisory Platform{% endblock %}
+{% block content %}
+<h1>🧠 Full Farm Advisory</h1>
+<p class="subtitle">
+  Fuse live sensor telemetry with optional leaf/sky photos and live weather into prioritized,
+  actionable recommendations — then download the full markdown &amp; JSON report.
+</p>
+
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+
+<div class="card">
+  <form method="post" enctype="multipart/form-data">
+    <h2>Sensor telemetry</h2>
+    <div class="field-row">
+      {% for f in fields %}
+      <div>
+        <label class="field-label" for="{{ f.name }}">{{ f.label }} ({{ f.unit }})</label>
+        <input type="number" id="{{ f.name }}" name="{{ f.name }}"
+               step="{{ f.step }}" min="{{ f.low }}" max="{{ f.high }}"
+               value="{{ values.get(f.name, f.default) }}" required>
+        <div class="field-hint">ideal {{ f.low }}–{{ f.high }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <h2 style="margin-top: 24px;">Optional inputs</h2>
+    <div class="field-row">
+      <div>
+        <label class="field-label" for="leaf_image">Leaf photo (optional)</label>
+        <input type="file" id="leaf_image" name="leaf_image" accept="image/*">
+      </div>
+      <div>
+        <label class="field-label" for="sky_image">Sky / field photo (optional)</label>
+        <input type="file" id="sky_image" name="sky_image" accept="image/*">
+      </div>
+    </div>
+
+    <label class="checkbox-row" for="use_weather">
+      <input type="checkbox" id="use_weather" name="use_weather" {{ 'checked' if use_weather }}>
+      <span>Include live weather in the advisory</span>
+    </label>
+
+    <div class="field-row" id="weather-fields" style="{{ '' if use_weather else 'display: none;' }}">
+      <div>
+        <label class="field-label" for="latitude">Latitude <small>(defaults to farm)</small></label>
+        <input type="number" id="latitude" name="latitude" step="0.0001" min="-90" max="90"
+               value="{{ latitude or '' }}">
+      </div>
+      <div>
+        <label class="field-label" for="longitude">Longitude <small>(defaults to farm)</small></label>
+        <input type="number" id="longitude" name="longitude" step="0.0001" min="-180" max="180"
+               value="{{ longitude or '' }}">
+      </div>
+    </div>
+
+    <div style="margin-top: 18px;">
+      <button type="submit">Generate Advisory</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  window.addEventListener('DOMContentLoaded', function () {
+    const checkbox = document.getElementById('use_weather');
+    const fields = document.getElementById('weather-fields');
+    if (!checkbox || !fields) return;
+    checkbox.addEventListener('change', function () {
+      fields.style.display = checkbox.checked ? '' : 'none';
+    });
+  });
+</script>
+
+{% if result %}
+<div class="card">
+  <h2>Advisory — {{ result.crop }} <span style="color: var(--muted); font-weight: 400; font-size: 0.9rem;">node {{ result.node_id }} · {{ result.timestamp }}</span></h2>
+
+  <div class="alert info"><strong>Summary:</strong> {{ result.summary }}</div>
+
+  <div class="kpi-row">
+    <div class="kpi"><div class="value">{{ result.sensor.disease_prediction }}</div><div class="label">crop state</div></div>
+    <div class="kpi"><div class="value">{{ result.sensor.yield_forecast }}</div><div class="label">yield forecast</div></div>
+    {% if result.weather %}
+    <div class="kpi"><div class="value">{{ result.weather.weather_label }}</div><div class="label">weather now</div></div>
+    {% endif %}
+    <div class="kpi"><div class="value">{{ result.recommendations|length }}</div><div class="label">actions</div></div>
+  </div>
+
+  {% if result.leaf %}
+  <div class="alert info">🍃 <strong>Leaf image:</strong> {{ result.leaf.prediction }} ({{ (result.leaf.probability * 100)|round(1) }}%)</div>
+  {% endif %}
+  {% if result.sky %}
+  <div class="alert info">🛰️ <strong>Sky image:</strong> {{ result.sky.prediction }} ({{ (result.sky.probability * 100)|round(1) }}%)</div>
+  {% endif %}
+
+  <h3 style="margin-top: 22px;">Recommended actions</h3>
+  {% if result.recommendations %}
+  <table>
+    <thead><tr><th>Priority</th><th>Category</th><th>Action</th><th>Rationale</th></tr></thead>
+    <tbody>
+      {% for rec in result.recommendations %}
+      <tr>
+        <td><span class="badge {{ rec.priority|lower }}">{{ rec.priority }}</span></td>
+        <td>{{ rec.category }}</td>
+        <td>{{ rec.action }}</td>
+        <td style="color: var(--muted); font-size: 0.88rem;">{{ rec.rationale }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>✅ No urgent actions required — keep the current management plan.</p>
+  {% endif %}
+</div>
+
+{% if report_links %}
+<div class="card">
+  <h2>Download report</h2>
+  <div class="download-links">
+    <a class="btn" href="{{ url_for('advisory_report', filename=report_links.markdown) }}">⬇ Markdown report</a>
+    <a class="btn secondary" href="{{ url_for('advisory_report', filename=report_links.json) }}">⬇ JSON report</a>
+  </div>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

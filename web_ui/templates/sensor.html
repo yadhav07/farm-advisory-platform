@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Sensor Diagnosis · Farm Advisory Platform{% endblock %}
+{% block content %}
+<h1>📡 Sensor Diagnosis &amp; Yield Forecast</h1>
+<p class="subtitle">Enter the eight field readings from a soil/air sensor node. A trained Random Forest classifies disease state and a regressor forecasts Yield_Rate.</p>
+
+{% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+
+<div class="card">
+  <form method="post">
+    <div class="field-row">
+      {% for f in fields %}
+      <div>
+        <label class="field-label" for="{{ f.name }}">{{ f.label }} ({{ f.unit }})</label>
+        <input type="number" id="{{ f.name }}" name="{{ f.name }}"
+               step="{{ f.step }}" min="{{ f.low }}" max="{{ f.high }}"
+               value="{{ values.get(f.name, f.default) }}" required>
+        <div class="field-hint">ideal {{ f.low }}–{{ f.high }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <div style="margin-top: 18px;">
+      <button type="submit">Diagnose &amp; Forecast</button>
+    </div>
+  </form>
+</div>
+
+{% if result %}
+<div class="card">
+  <h2>Result</h2>
+  <div class="result-hero">
+    <div>
+      <div class="big {{ '' if result.prediction == 'Healthy' else 'unhealthy' }}">
+        {{ result.prediction }}
+      </div>
+      <div style="color: var(--muted); font-size: 0.9rem;">predicted crop state</div>
+    </div>
+    {% if result.yield_forecast is not none %}
+    <div class="kpi">
+      <div class="value">{{ result.yield_forecast }}</div>
+      <div class="label">Yield_Rate forecast</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <h3 style="margin-top: 22px;">Class probabilities</h3>
+  <table>
+    <thead><tr><th>Class</th><th>Probability</th></tr></thead>
+    <tbody>
+      {% for cls, prob in result.probabilities.items() %}
+      <tr>
+        <td>{{ cls }}</td>
+        <td>
+          <div class="prob-bar"><span style="width: {{ (prob * 100)|round(1) }}%"></span></div>
+          <small>{{ (prob * 100)|round(1) }}%</small>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}
