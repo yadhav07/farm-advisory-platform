@@ -102,29 +102,6 @@ def top_risk(probabilities):
                key=lambda kv: kv[1], default=(None, 0.0))
 
 
-def _at(sequence, index):
-    if not sequence or index >= len(sequence):
-        return None
-    return sequence[index]
-
-
-def build_forecast_rows(snapshot):
-    """Zip the weather feed's parallel forecast lists into row dicts."""
-    rows = []
-    if not snapshot or not snapshot.get('forecast'):
-        return rows
-    forecast = snapshot['forecast']
-    for i, day in enumerate(forecast.get('dates', [])):
-        rows.append({
-            'date': day,
-            't_min': _at(forecast.get('t_min'), i),
-            't_max': _at(forecast.get('t_max'), i),
-            'precip_prob': _at(forecast.get('precip_probability'), i),
-            'precip_sum': _at(forecast.get('precip_sum'), i),
-        })
-    return rows
-
-
 def disease_items(probabilities):
     return [(k.replace('_', ' ').title(), float(v)) for k, v in (probabilities or {}).items()]
 
@@ -253,42 +230,23 @@ def api_latest():
 # ---------------------------------------------------------------------------
 # Overview
 # ---------------------------------------------------------------------------
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/')
 def index():
     error = None
     result = None
     live = None
-    weather = None
-    rows = []
     risk = (None, 0.0)
-    values = sensor_values_for_defaults()
-    defaults = model_service.get_farm_defaults()
-    latitude, longitude = defaults['latitude'], defaults['longitude']
 
     try:
         live = resolve_live_reading()
-        values = live['sensor']
-        result = model_service.sensor_predict(values)
+        result = model_service.sensor_predict(live['sensor'])
         risk = top_risk(result['probabilities'])
-
-        # Optional location override for the weather card.
-        if request.method == 'POST':
-            latitude = float(request.form.get('latitude', latitude))
-            longitude = float(request.form.get('longitude', longitude))
-            if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
-                raise ValueError('coordinates out of range')
-        weather = model_service.build_weather_feed(
-            latitude, longitude).fetch_current()
-        rows = build_forecast_rows(weather)
-    except ValueError as exc:
-        error = format_error(str(exc))
     except Exception as exc:
         error = format_error(str(exc))
 
     return render_template(
-        'index.html', result=result, live=live, weather=weather,
-        forecast_rows=rows, telemetry=resolve_history(live), risk=risk,
-        error=error, latitude=latitude, longitude=longitude,
+        'index.html', result=result, live=live, risk=risk,
+        telemetry=resolve_history(live), error=error,
     )
 
 

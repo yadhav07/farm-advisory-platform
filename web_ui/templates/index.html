@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_charts.html" import donut, sparkgrid, forecast, flow %}
+{% from "_charts.html" import donut, sparkgrid %}
 
 {% block title %}Overview · FarmIQ{% endblock %}
 {% block crumb %}Overview{% endblock %}
@@ -69,8 +69,8 @@
     </article>
   </div>
 
-  <div class="overview-visual-grid">
-    <article class="panel-card">
+  <div class="grid-2" style="margin-top:16px;">
+    <article class="panel-card donut-card">
       <div class="panel-header">
         <div><span class="panel-kicker">MODEL OUTPUT</span><h2>Disease split</h2></div>
         <span class="panel-period">Random Forest</span>
@@ -80,26 +80,6 @@
                center_label=result.prediction) }}
     </article>
 
-    <article class="panel-card">
-      <div class="panel-header">
-        <div><span class="panel-kicker">PIPELINE</span><h2>How a reading becomes advice</h2></div>
-        <i class="fa-solid fa-diagram-project panel-header-icon"></i>
-      </div>
-      {% set lane = [
-        {'input_label': 'Field telemetry', 'input_value': live.device_id,
-         'input_icon': 'green', 'input_glyph': 'fa-tower-broadcast',
-         'input_active': live.source == 'device'},
-        {'input_label': '8 features', 'input_value': 'moisture, pH, NPK',
-         'input_icon': 'green', 'input_glyph': 'fa-sliders',
-         'process_label': 'Random Forest', 'process_value': 'classifier + regressor',
-         'process_icon': 'violet', 'process_glyph': 'fa-brain',
-         'output_label': 'Crop state', 'output_value': result.prediction}
-      ] %}
-      {{ flow(lane) }}
-    </article>
-  </div>
-
-  <div class="overview-visual-grid">
     <article class="panel-card">
       <div class="panel-header">
         <div><span class="panel-kicker">READING LOG</span><h2>Last 10 readings</h2></div>
@@ -128,37 +108,14 @@
         </table>
       </div>
     </article>
-
-    <article class="panel-card">
-      <div class="panel-header">
-        <div><span class="panel-kicker">TRENDS</span><h2>How conditions move</h2></div>
-        <i class="fa-solid fa-chart-line panel-header-icon"></i>
-      </div>
-      <div class="panel-body">{{ sparkgrid(telemetry) }}</div>
-    </article>
   </div>
 
-  <article class="panel-card">
+  <article class="panel-card" style="margin-top:16px;">
     <div class="panel-header">
-      <div><span class="panel-kicker">WEATHER</span><h2>Three-day outlook</h2></div>
-      <form method="post" class="chart-controls">
-        <input type="number" name="latitude" step="0.0001" value="{{ latitude }}"
-               style="width:120px;min-height:34px" aria-label="Latitude">
-        <input type="number" name="longitude" step="0.0001" value="{{ longitude }}"
-               style="width:120px;min-height:34px" aria-label="Longitude">
-        <button type="submit" class="secondary-button"><i class="fa-solid fa-location-crosshairs"></i> Set</button>
-      </form>
+      <div><span class="panel-kicker">TRENDS</span><h2>How conditions move</h2></div>
+      <i class="fa-solid fa-chart-line panel-header-icon"></i>
     </div>
-    <div class="panel-body">
-      {% if weather %}
-        <p class="panel-hint">
-          {{ weather.weather_label }} &middot; {{ fmt(weather.temperature) }}&deg;C now
-          &middot; wind {{ fmt(weather.wind_speed_kmh) }} km/h
-          &middot; source {{ weather.source }}
-        </p>
-      {% endif %}
-      {{ forecast(forecast_rows) }}
-    </div>
+    <div class="panel-body">{{ sparkgrid(telemetry) }}</div>
   </article>
   {% endif %}
 

@@ -42,10 +42,10 @@ python app.py
 The browser opens automatically at <http://127.0.0.1:5001>. The server binds to
 `0.0.0.0` so field nodes on the same network can reach it.
 
-Four pages: **overview** (live metrics, the disease pie chart, the reading log and
-the weather outlook), **field node** (connect an ESP32 by IP), **vision** (leaf
-and sky photo classifiers) and **advisory** (run the pipeline, get ranked
-actions and a downloadable report).
+Four pages: **overview** (live metrics, the disease pie chart, the reading log
+and the trend charts), **field node** (connect an ESP32 by IP), **vision**
+(leaf and sky photo classifiers) and **advisory** (run the pipeline with live
+weather, get ranked actions and a downloadable report).
 
 ### 3. Connect an ESP32 field node
 

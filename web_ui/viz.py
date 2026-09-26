@@ -29,8 +29,6 @@ FEATURE_LABELS = {
     'Light_Intensity': 'Light',
 }
 
-GUARD_COLORS = {'low': '#c62828', 'mid': '#f9a825', 'high': '#2e7d32'}
-
 
 # ---------------------------------------------------------------------------
 # formatting
@@ -111,56 +109,6 @@ def donut_segments(values, colors=None, center_label=None, center_value=None):
         'segments': segments,
         'center_value': center_value or f'{top["pct"]:.1f}%',
         'center_label': center_label or top['label'],
-    }
-
-
-# ---------------------------------------------------------------------------
-# semicircular gauge
-# ---------------------------------------------------------------------------
-def gauge_geometry(value, low=10.0, high=100.0, width=240.0, height=140.0,
-                   band_low=38.0, band_high=60.0):
-    """Arc path, progress dash and needle tip for the yield gauge."""
-    try:
-        reading = float(value)
-    except (TypeError, ValueError):
-        reading = float(low)
-    try:
-        span = float(high) - float(low)
-        fraction = 0.0 if span <= 0 else (reading - float(low)) / span
-    except (TypeError, ValueError):
-        fraction = 0.0
-    fraction = max(0.0, min(1.0, fraction))
-
-    radius = (width / 2.0) - 18.0
-    cx, cy = width / 2.0, height - 24.0
-    arc_length = math.pi * radius
-    angle = math.radians(180.0 * fraction)   # 180 deg = left, 0 deg = right
-
-    if fraction < 0.4:
-        color = GUARD_COLORS['low']
-    elif fraction < 0.66:
-        color = GUARD_COLORS['mid']
-    else:
-        color = GUARD_COLORS['high']
-
-    return {
-        'width': width,
-        'height': height,
-        'cx': round(cx, 2),
-        'cy': round(cy, 2),
-        'radius': round(radius, 2),
-        'track_path': (f'M {cx - radius:.2f} {cy:.2f} '
-                       f'A {radius:.2f} {radius:.2f} 0 0 1 {cx + radius:.2f} {cy:.2f}'),
-        'dasharray': f'{fraction * arc_length:.2f} {arc_length:.2f}',
-        'tip_x': round(cx + radius * 0.76 * math.cos(angle), 2),
-        'tip_y': round(cy - radius * 0.76 * math.sin(angle), 2),
-        'fraction': fraction * 100.0,
-        'color': color,
-        'value': reading,
-        'low': low,
-        'high': high,
-        'band_low': band_low,
-        'band_high': band_high,
     }
 
 
@@ -263,79 +211,6 @@ def sparkline(values, width=320.0, height=96.0, pad=8.0):
     }
 
 
-# ---------------------------------------------------------------------------
-# weather forecast bars
-# ---------------------------------------------------------------------------
-def forecast_geometry(rows, height=150.0):
-    """Per-day column geometry: min/max bar position on a shared scale."""
-    usable = height - 26.0
-    lows, highs = [], []
-    for row in rows:
-        try:
-            lows.append(float(row.get('t_min')))
-            highs.append(float(row.get('t_max')))
-        except (TypeError, ValueError):
-            lows.append(None)
-            highs.append(None)
-
-    present = [v for v in lows + highs if v is not None]
-    if not present:
-        return {'days': [], 'scale_min': 0, 'scale_max': 1, 'height': height}
-
-    scale_min = min(present) - 3.0
-    scale_max = max(present) + 3.0
-    span = scale_max - scale_min or 1.0
-
-    days = []
-    for index, row in enumerate(rows):
-        low, high = lows[index], highs[index]
-        if low is None or high is None:
-            days.append({'date': row.get('date'), 'valid': False})
-            continue
-        days.append({
-            'date': row.get('date'),
-            'valid': True,
-            'bottom': round(((low - scale_min) / span) * usable, 2),
-            'height': round(((high - low) / span) * usable, 2),
-            't_min': low,
-            't_max': high,
-            'precip_prob': row.get('precip_prob') or 0,
-            'precip_sum': row.get('precip_sum') or 0,
-        })
-    return {'days': days, 'scale_min': scale_min, 'scale_max': scale_max,
-            'height': height, 'usable': usable}
-
-
-def history_stats(records, guide):
-    """Per-feature min / mean / max for a list of logged readings."""
-    stats = []
-    if not records:
-        return stats
-    for field in guide:
-        values = []
-        for row in records:
-            value = row.get(field['name'])
-            if value is None:
-                continue
-            try:
-                values.append(float(value))
-            except (TypeError, ValueError):
-                continue
-        if not values:
-            continue
-        stats.append({
-            'label': field['label'],
-            'unit': field['unit'],
-            'low': field['low'],
-            'high': field['high'],
-            'min': min(values),
-            'mean': sum(values) / len(values),
-            'max': max(values),
-            'count': len(values),
-        })
-    return stats
-
-
 # Exposed to Jinja as globals.
 VIZ = {
     'fmt': fmt,
@@ -343,11 +218,8 @@ VIZ = {
     'bar_position': bar_position,
     'in_range': in_range,
     'donut_segments': donut_segments,
-    'gauge_geometry': gauge_geometry,
     'radar_geometry': radar_geometry,
     'sparkline': sparkline,
-    'forecast_geometry': forecast_geometry,
-    'history_stats': history_stats,
     'PRIORITY_COLORS': PRIORITY_COLORS,
     'CATEGORY_COLORS': CATEGORY_COLORS,
 }

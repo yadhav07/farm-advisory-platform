@@ -318,7 +318,7 @@ A deliberately small Flask dashboard: four pages, one job each. Models are loade
 
 | Route | Page | Function |
 | :--- | :--- | :--- |
-| `/` | Overview | Live metrics (crop state, yield, top risk), the disease pie chart, the reading log, trend sparklines, the pipeline lanes and the three-day weather outlook. |
+| `/` | Overview | Live metrics (crop state, yield, top risk), the disease pie chart, the reading log and the trend sparklines. |
 | `/device` | Field node | IP-address connection panel, reachability probe, latest reading, known-node table and the firmware payload contract. |
 | `/vision` | Vision | Two image classifiers side by side: leaf disease (EfficientNet-B0) and weather state (weather CNN), each with a confidence donut and top-3 bars. |
 | `/advisory` | Advisory | Slider-driven full pipeline -> ranked actions, the disease pie for the scenario, the feature profile and downloadable markdown/JSON reports. |
@@ -356,12 +356,11 @@ Sensor mapping and provenance rules are documented in
 | `radar` | inline SVG polygons, rings and axes | sensor profile against the ideal midpoint |
 | `rangebars` | HTML/CSS bars over a track | reading position inside each admissible range |
 | `sparkgrid` | inline SVG polylines | telemetry trends |
-| `forecast` | HTML/CSS positioned columns | 3-day temperature range and precipitation |
-| `flow` | HTML/CSS nodes with arrow connectors | signal-flow lanes (input to model to output) |
 | `suggestions` | HTML cards | ranked advisory actions with priority badges |
 
 ### 6.2 Design Points
 - **Workspace shell** - a fixed sidebar (brand, navigation, node status card), a sticky top bar with breadcrumbs and live-node state, and a content column built from metric cards, panel cards, data tables and suggestion lists.
+- **Aligned rows** - every two-column row uses equal `minmax(0, 1fr)` columns; cards stretch to the tallest card in the row and the panel body fills the leftover height, so card headers, charts and tables line up. Metric cards pin their sub-text to the bottom with `margin-top: auto`.
 - **Slider-based simulator** - the advisory inputs use `input[type=range]` with live readouts and a JS-painted progress track, replacing plain number boxes.
 - **Single inference layer** (`model_service.py`) - every model artifact (sensor `rf_model.joblib`, leaf checkpoint, satellite checkpoint) is loaded lazily into a module-level singleton and reused across requests.
 - **Geometry-only Python** (`viz.py`) - pure functions for donut gradients, radar polygons, sparkline points, forecast bars and history statistics, registered as Jinja globals. Nothing is rasterised.

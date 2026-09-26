@@ -26,22 +26,25 @@ on the same network can reach it.
 
 | Route       | What it does                                                             |
 |-------------|--------------------------------------------------------------------------|
-| `/`         | Overview: live metrics, the disease pie chart, the reading log, trends, the pipeline and the weather outlook |
+| `/`         | Overview: live metrics, the disease pie chart, the reading log and the trend charts                  |
 | `/device`   | Field node: connect an ESP32 by IP address and see its latest reading      |
 | `/vision`   | Two image classifiers: leaf disease and weather state                     |
 | `/advisory` | Run the full pipeline and get ranked actions plus a downloadable report    |
 
 ## Overview page
 
-The dashboard answers four questions and nothing else:
+The dashboard answers three questions and nothing else:
 
 1. **What state is the field in?** — crop state, yield forecast, top disease risk
 2. **Why?** — the disease pie chart from the Random Forest classifier
 3. **How is it changing?** — the last 10 readings as a table, plus trend sparklines
-4. **What does the weather do?** — a three-day outlook with a location field
 
-The pipeline lanes show how a reading becomes advice, so the flow is visible
-without a separate page.
+The metric row sits above an equal-width two-column row (pie chart and reading
+log), with the trends card full width below. Cards in a row share one height and
+the panel body fills the remaining space, so headers and charts line up.
+
+Weather is not on the dashboard; it is folded into the advisory run, where the
+live forecast actually changes a recommendation.
 
 ## Field-node API
 
@@ -77,8 +80,6 @@ strings) registered as Jinja globals. `_charts.html` turns them into macros:
 | `radar`       | inline SVG polygons, rings and axes          | sensor profile against ideal range          |
 | `rangebars`   | HTML/CSS bars over a track                   | reading position inside each range          |
 | `sparkgrid`   | inline SVG polylines                         | telemetry trends                            |
-| `forecast`    | HTML/CSS positioned columns                  | 3-day temperature range and rain            |
-| `flow`        | HTML/CSS nodes with arrow connectors         | signal-flow lanes                           |
 | `suggestions` | HTML cards                                   | ranked advisory actions                     |
 
 Typography and icons come from Manrope and Font Awesome via CDN; the layout

@@ -298,28 +298,6 @@ def live_reading(stress_profile='normal'):
     return node.read()
 
 
-def recent_reports(limit=6):
-    """Most recently written advisory reports, newest first."""
-    report_dir = get_report_dir()
-    if not os.path.isdir(report_dir):
-        return []
-    entries = []
-    for name in os.listdir(report_dir):
-        if not name.endswith(('.md', '.json')):
-            continue
-        full = os.path.join(report_dir, name)
-        try:
-            entries.append({
-                'name': name,
-                'size_kb': round(os.path.getsize(full) / 1024, 1),
-                'modified': os.path.getmtime(full),
-            })
-        except OSError:
-            continue
-    entries.sort(key=lambda item: item['modified'], reverse=True)
-    return entries[:limit]
-
-
 def get_farm_defaults():
     _ensure_on_path(os.path.join(PROJECT_ROOT, 'farm_advisory'))
     import config

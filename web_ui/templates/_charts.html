@@ -3,7 +3,7 @@
   browser draws them. Geometry comes from the viz.py Jinja globals.
 -#}
 
-{#- Donut: disease / confidence / priority mix -#}
+{#- Donut: disease / classifier confidence -#}
 {% macro donut(items, center_value=None, center_label=None, colors=None) %}
 {% set d = donut_segments(items, colors=colors, center_value=center_value, center_label=center_label) %}
 <div class="donut-layout">
@@ -77,7 +77,7 @@
 {% endmacro %}
 
 
-{#- Small-multiple telemetry time series -#}
+{#- Telemetry trends -#}
 {% macro sparkgrid(records) %}
 {% set panels = [
   {'title': 'Temperature',   'series': [('Temperature', 'C', '#d97706')]},
@@ -112,56 +112,6 @@
   {% endfor %}
 </div>
 {% endif %}
-{% endmacro %}
-
-
-{#- Weather forecast columns -#}
-{% macro forecast(rows) %}
-{% if not rows %}
-<div class="empty">Forecast unavailable right now.</div>
-{% else %}
-{% set g = forecast_geometry(rows) %}
-<div class="forecast">
-  {% for day in g.days %}
-  {% if day.valid %}
-  <div class="fc-day">
-    <div class="fc-bar-wrap" style="height: {{ g.usable }}px">
-      <span class="fc-bar" style="bottom: {{ day.bottom }}px; height: {{ day.height }}px">
-        <b class="fc-max">{{ day.t_max|round(0) }}&deg;</b>
-        <b class="fc-min">{{ day.t_min|round(0) }}&deg;</b>
-      </span>
-    </div>
-    <div class="fc-date">{{ day.date[5:] }}</div>
-    <div class="fc-precip">{{ day.precip_prob|round(0) }}%</div>
-  </div>
-  {% endif %}
-  {% endfor %}
-</div>
-{% endif %}
-{% endmacro %}
-
-
-{#- Signal-flow lanes: input → process → output -#}
-{% macro flow(rows) %}
-<div class="flowchart">
-  {% for row in rows %}
-  <div class="flow-lane">
-    <div class="flow-node {{ 'flow-input-active' if row.input_active }}">
-      <span class="flow-node-icon {{ row.input_icon }}"><i class="fa-solid {{ row.input_glyph }}"></i></span>
-      <div><small>{{ row.input_label }}</small><strong>{{ row.input_value }}</strong></div>
-    </div>
-    <div class="flow-arrow"><span></span><i class="fa-solid fa-chevron-right"></i></div>
-    <div class="flow-node">
-      <span class="flow-node-icon {{ row.process_icon }}"><i class="fa-solid {{ row.process_glyph }}"></i></span>
-      <div><small>{{ row.process_label }}</small><strong>{{ row.process_value }}</strong></div>
-    </div>
-    <div class="flow-arrow"><span></span><i class="fa-solid fa-chevron-right"></i></div>
-    <div class="flow-node flow-output">
-      <div><small>{{ row.output_label }}</small><strong>{{ row.output_value }}</strong></div>
-    </div>
-  </div>
-  {% endfor %}
-</div>
 {% endmacro %}
 
 
