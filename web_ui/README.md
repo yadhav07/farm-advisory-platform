@@ -1,12 +1,42 @@
 # Web UI (Flask)
 
-Three pages, one job each, under a single sticky top bar. Every trained
-subsystem is visible from the same dashboard.
+Four pages, one job each, behind a fixed sidebar. Every trained subsystem is
+visible from the same dashboard.
 
 The dashboard reports **real hardware only**. There is no simulated node, so
-until an ESP32 posts a reading the overview shows an empty state that names the
-ingest endpoint. The advisory page works without a node, starting from the
-documented field-guide defaults.
+with nothing reporting the overview still renders in full - the metric row, the
+pie chart, the reading log and the trends - with empty values rather than a
+placeholder screen. The page **polls for a node** and reloads itself the moment
+one reports, so it never needs a manual refresh. The advisory page works
+without a node, starting from the documented field-guide defaults.
+
+## Vision pages
+
+Each page is a two-card row: the upload form on the left, the result on the
+right. After a classification a third card appears with the class distribution
+as a donut. The result card and the distribution legend show the same
+percentages, so there are deliberately no extra top-k bars.
+
+| Page | Model | Result label |
+| :--- | :--- | :--- |
+| `/vision/leaf` | EfficientNet-B0 | Diagnosis |
+| `/vision/sky` | Weather CNN | Weather state |
+
+## What an empty overview looks like
+
+The layout is always the real one, so the design can be reviewed with or without
+hardware attached:
+
+| Panel | No reading |
+| :--- | :--- |
+| Crop state | `No data` |
+| Yield forecast, top risk, soil moisture | an em dash, with the caption saying why |
+| Disease split | the card keeps its header, the body says the classifier has nothing to score |
+| Reading log | the table renders with a `No readings logged yet.` row |
+| Trends | the four panels render with a `No telemetry logged yet.` note |
+
+The sidebar node card and the top bar pill both read `No node reporting`, so it
+is always clear that the empty values mean "no hardware", not "no data model".
 
 ## Run
 
@@ -29,14 +59,29 @@ on the same network can reach it.
 
 ## Pages
 
-| Route       | What it does                                                          |
-|-------------|-----------------------------------------------------------------------|
-| `/`         | Overview: live metrics, the disease pie chart, the reading log, trends |
-| `/vision`   | Two image classifiers: leaf disease and weather state                  |
-| `/advisory` | Run the full pipeline and get ranked actions plus a report            |
+| Route          | What it does                                                          |
+|----------------|-----------------------------------------------------------------------|
+| `/`            | Overview: live metrics, the disease pie chart, the reading log, trends |
+| `/vision/leaf` | Leaf Vision: classify a leaf photo as a disease                        |
+| `/vision/sky`  | Sky Vision: classify a sky photo as a weather state                     |
+| `/advisory`    | Run the full pipeline and get ranked actions plus a report            |
 
-Navigation lives in the top bar as three tabs, next to the brand and the node
-status pill. There is no sidebar.
+`/vision` redirects to `/vision/leaf`, so older links still land somewhere sensible.
+An unknown model segment (`/vision/nonsense`) returns 404.
+
+Navigation is the sidebar: brand, four items, and a node-status card that shows
+the real device as online, idle, or not reporting. The sticky top bar carries
+the breadcrumb and the same status as a pill.
+
+Leaf Vision and Sky Vision share one Flask endpoint (`/vision/<kind>`) and one
+template. Everything model-specific - title, heading, blurb, model name, icon,
+colour, empty-state copy - lives in the `VISION_MODELS` dict in `app.py`, so
+`vision.html` has no conditionals and adding a third image model is a dict
+entry plus a sidebar row.
+
+Because both tabs share the `vision` endpoint, the sidebar compares
+`request.view_args['kind']` as well as `request.endpoint`; otherwise both tabs
+would light up at the same time.
 
 ## Overview page
 
@@ -121,8 +166,13 @@ web_ui/
 The stylesheet documents the five rules that keep every page aligned, in a
 comment at the top of `static/style.css`:
 
-1. `.topbar-inner` and `.content-wrap` share one `--shell-width` and one
-   `--shell-pad`, so the brand, the tabs and every card start at the same x.
+1. `.app-shell` is a two-column grid. The sidebar is its own sticky column and
+   the content column is `minmax(0, 1fr)`, so the sidebar can never push the
+   cards out of alignment. Inside the content column, `.topbar-inner` and
+   `.content-wrap` share one `--shell-width` and one `--shell-pad`, so the top
+   bar and every card start at the same x. Below 980px the sidebar becomes a
+   horizontal bar and is deliberately *not* sticky, so the top bar keeps
+   `top: 0` and there is no double-sticky offset to get wrong.
 2. `.view` is a single-column flex with one `--gutter` gap, so every card row on
    every page is separated by the same space and no template needs an inline
    margin for it.

@@ -35,7 +35,8 @@ if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 from flask import (
-    Flask, g, render_template, request, abort, send_from_directory, jsonify,
+    Flask, g, render_template, request, abort, redirect, url_for,
+    send_from_directory, jsonify,
 )
 from werkzeug.utils import secure_filename
 
@@ -49,6 +50,34 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'bmp'}
 
 app = Flask(__name__)
 app.jinja_env.globals.update(viz.VIZ)
+
+
+# The two image classifiers, one page each. Everything the template needs to
+# render a vision page lives here, so vision.html stays free of conditionals.
+VISION_MODELS = {
+    'leaf': {
+        'title': 'Leaf Vision',
+        'heading': 'Classify a leaf.',
+        'blurb': 'Upload a close-up of a single leaf and the EfficientNet-B0 '
+                 'classifier names the disease it sees.',
+        'model': 'EfficientNet-B0',
+        'result_label': 'Diagnosis',
+        'glyph': 'fa-leaf',
+        'tone': 'cement',
+        'empty': 'Upload a close-up of one leaf to see the diagnosis.',
+    },
+    'sky': {
+        'title': 'Sky Vision',
+        'heading': 'Classify the sky.',
+        'blurb': 'Upload a photo of the sky and the weather CNN names the '
+                 'conditions it sees.',
+        'model': 'Weather CNN',
+        'result_label': 'Weather state',
+        'glyph': 'fa-cloud-sun',
+        'tone': 'power',
+        'empty': 'Upload a photo of the sky to see the weather state.',
+    },
+}
 
 
 # ---------------------------------------------------------------------------
@@ -260,23 +289,30 @@ def index():
         except Exception as exc:
             error = format_error(str(exc))
 
-    return render_template(
-        'index.html', result=result, risk=risk, telemetry=telemetry, error=error,
-        ingest_url=request.url_root.rstrip('/') + '/api/sensor-data',
-    )
+    return render_template('index.html', result=result, risk=risk,
+                           telemetry=telemetry, error=error)
 
 
 # ---------------------------------------------------------------------------
 # Vision: leaf disease and weather-state classification
 # ---------------------------------------------------------------------------
-@app.route('/vision', methods=['GET', 'POST'])
-def vision():
-    leaf_result = None
-    sky_result = None
+@app.route('/vision')
+def vision_index():
+    """The old combined page: send people to the leaf classifier."""
+    return redirect(url_for('vision', kind='leaf'))
+
+
+@app.route('/vision/<kind>', methods=['GET', 'POST'])
+def vision(kind):
+    """One page per image model, both driven by the same template."""
+    meta = VISION_MODELS.get(kind)
+    if meta is None:
+        abort(404)
+
+    result = None
     error = None
 
     if request.method == 'POST':
-        model = request.form.get('model')
         upload = request.files.get('image')
         if upload is None or upload.filename == '':
             error = format_error('Choose an image first.')
@@ -285,16 +321,16 @@ def vision():
         else:
             path = save_upload(upload)
             try:
-                if model == 'sky':
-                    sky_result = model_service.satellite_diagnose(path)
+                if kind == 'sky':
+                    result = model_service.satellite_diagnose(path)
                 else:
-                    leaf_result = model_service.leaf_diagnose(path)
+                    result = model_service.leaf_diagnose(path)
             except Exception as exc:
                 error = format_error(str(exc))
             finally:
                 shutil.rmtree(UPLOAD_DIR, ignore_errors=True)  # keep the tree tidy
 
-    return render_template('vision.html', leaf=leaf_result, sky=sky_result, error=error)
+    return render_template('vision.html', kind=kind, meta=meta, result=result, error=error)
 
 
 # ---------------------------------------------------------------------------

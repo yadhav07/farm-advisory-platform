@@ -3,7 +3,12 @@
 
 {% block title %}Overview · FarmIQ{% endblock %}
 
+{% block crumb %}Overview{% endblock %}
+
 {% block content %}
+{# The real overview, always. With no node reporting the panels render empty
+   rather than being replaced by a placeholder, so the page is the same one
+   you see with data - only the numbers are missing. #}
 <section class="view">
 
   <div class="page-heading">
@@ -15,29 +20,34 @@
           Live reading from <strong>{{ live.device_id }}</strong>{% if live.source_ip %} ({{ live.source_ip }}){% endif %},
           classified by the disease model and scored by the yield regressor.
         {% else %}
-          Nothing is reporting yet. The dashboard shows real hardware only, so
-          point a node at the ingest endpoint and this page fills in.
+          No field node is reporting, so the panels below are empty. This page
+          refreshes itself the moment a node posts to
+          <code>/api/sensor-data</code>.
         {% endif %}
       </p>
     </div>
     <div class="heading-note">
       <i class="fa-regular fa-clock"></i>
       <span>
-        <strong>{{ live.timestamp[11:19] ~ ' UTC' if live else 'Waiting' }}</strong>
+        <strong>{{ live.timestamp[11:19] ~ ' UTC' if live else 'No reading yet' }}</strong>
         {{ telemetry|length }} readings logged
       </span>
     </div>
   </div>
 
-  {% if result %}
   <div class="metric-grid">
     <article class="metric-card metric-card-total">
       <div class="metric-topline">
         <span>Crop state</span>
         <span class="metric-icon metric-icon-total"><i class="fa-solid fa-wheat-awn"></i></span>
       </div>
-      <strong class="metric-value metric-value-text">{{ result.prediction }}</strong>
-      <p>{{ pct(result.probabilities[result.prediction]) }} confidence</p>
+      {% if result %}
+        <strong class="metric-value metric-value-text">{{ result.prediction }}</strong>
+        <p>{{ pct(result.probabilities[result.prediction]) }} confidence</p>
+      {% else %}
+        <strong class="metric-value metric-value-text">No data</strong>
+        <p>awaiting a reading</p>
+      {% endif %}
     </article>
 
     <article class="metric-card">
@@ -45,8 +55,13 @@
         <span>Yield forecast</span>
         <span class="metric-icon metric-icon-save"><i class="fa-solid fa-seedling"></i></span>
       </div>
-      <strong class="metric-value">{{ fmt(result.yield_forecast) }}<small>/100</small></strong>
-      <p>regressor output</p>
+      {% if result %}
+        <strong class="metric-value">{{ fmt(result.yield_forecast) }}<small>/100</small></strong>
+        <p>regressor output</p>
+      {% else %}
+        <strong class="metric-value">&mdash;</strong>
+        <p>regressor idle</p>
+      {% endif %}
     </article>
 
     <article class="metric-card metric-card-amber">
@@ -54,8 +69,13 @@
         <span>Top disease risk</span>
         <span class="metric-icon metric-icon-amber"><i class="fa-solid fa-triangle-exclamation"></i></span>
       </div>
-      <strong class="metric-value">{{ pct(risk[1]) }}</strong>
-      <p>{{ risk[0].replace('_', ' ') if risk[0] else 'None' }}</p>
+      {% if result %}
+        <strong class="metric-value">{{ pct(risk[1]) }}</strong>
+        <p>{{ risk[0].replace('_', ' ') if risk[0] else 'None' }}</p>
+      {% else %}
+        <strong class="metric-value">&mdash;</strong>
+        <p>not classified</p>
+      {% endif %}
     </article>
 
     <article class="metric-card metric-card-blue">
@@ -63,8 +83,13 @@
         <span>Soil moisture</span>
         <span class="metric-icon metric-icon-blue"><i class="fa-solid fa-droplet"></i></span>
       </div>
-      <strong class="metric-value">{{ fmt(live.sensor.Moisture) }}<small>%</small></strong>
-      <p>air {{ fmt(live.sensor.Temperature) }}&deg;C &middot; {{ fmt(live.sensor.Humidity) }}% RH</p>
+      {% if live %}
+        <strong class="metric-value">{{ fmt(live.sensor.Moisture) }}<small>%</small></strong>
+        <p>air {{ fmt(live.sensor.Temperature) }}&deg;C &middot; {{ fmt(live.sensor.Humidity) }}% RH</p>
+      {% else %}
+        <strong class="metric-value">&mdash;</strong>
+        <p>no sensor reading</p>
+      {% endif %}
     </article>
   </div>
 
@@ -74,15 +99,24 @@
         <div><span class="panel-kicker">MODEL OUTPUT</span><h2>Disease split</h2></div>
         <span class="panel-period">Random Forest</span>
       </div>
-      {{ donut(disease_items(result.probabilities),
-               center_value=pct(result.probabilities[result.prediction]),
-               center_label=result.prediction) }}
+      {% if result %}
+        {{ donut(disease_items(result.probabilities),
+                 center_value=pct(result.probabilities[result.prediction]),
+                 center_label=result.prediction) }}
+      {% else %}
+        <div class="panel-body">
+          <div class="empty">
+            The classifier has no reading to score yet.<br>
+            The pie chart appears as soon as a node posts.
+          </div>
+        </div>
+      {% endif %}
     </article>
 
     <article class="panel-card">
       <div class="panel-header">
         <div><span class="panel-kicker">READING LOG</span><h2>Last 10 readings</h2></div>
-        <span class="panel-period">{{ live.device_id }}</span>
+        <span class="panel-period">{{ live.device_id if live else 'ESP32' }}</span>
       </div>
       <div class="table-wrap scroll-y">
         <table class="data-table">
@@ -116,34 +150,44 @@
     </div>
     <div class="panel-body">{{ sparkgrid(telemetry) }}</div>
   </article>
-  {% else %}
-
-  <article class="panel-card">
-    <div class="panel-header">
-      <div><span class="panel-kicker">NO TELEMETRY</span><h2>Waiting for a field node</h2></div>
-      <span class="panel-period">ESP32</span>
-    </div>
-    <div class="panel-body">
-      <p class="panel-hint">
-        No data is invented, so this page stays empty until real hardware
-        reports. Set <code>SERVER_URL</code> in the firmware to the endpoint
-        below; the node posts every few seconds and the overview fills in
-        immediately. The <a href="{{ url_for('advisory') }}">advisory page</a>
-        works without a node.
-      </p>
-      <pre class="payload-pre">POST {{ ingest_url }}
-Content-Type: application/json
-
-{
-  "device_id": "FARM_01",
-  "soil_moisture": 44,
-  "air_temperature": 27.3,
-  "humidity": 64.8,
-  "light_intensity": 585.2
-}</pre>
-    </div>
-  </article>
-  {% endif %}
 
 </section>
+{% endblock %}
+
+{% block scripts %}
+{% if not live %}
+<script>
+/* No node is reporting, so the panels above are empty. Poll the ingest API and
+   reload the moment one shows up - the page heals itself, no manual refresh.
+   Backs off when the tab is hidden and gives up after a bounded number of
+   tries so it never polls forever. */
+(function () {
+  var MAX_TRIES = 200;          /* ~10 minutes at 3s, then stop */
+  var tries = 0;
+  var timer = null;
+
+  function later(ms) { timer = setTimeout(poll, ms); }
+
+  function poll() {
+    if (document.hidden) { later(5000); return; }
+    fetch('/api/latest', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && data.source && data.source !== 'none') {
+          window.location.reload();
+          return;
+        }
+        if (++tries < MAX_TRIES) { later(3000); }
+      })
+      .catch(function () { if (++tries < MAX_TRIES) { later(5000); } });
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) { if (timer) { clearTimeout(timer); } poll(); }
+  });
+
+  poll();
+})();
+</script>
+{% endif %}
 {% endblock %}

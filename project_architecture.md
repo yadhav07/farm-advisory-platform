@@ -116,8 +116,8 @@ Multidisciplinary_Project/
 | **`web_ui`** | `viz.py` | Python Script | Geometry-only chart helpers. Builds CSS `conic-gradient` donuts, gauge arcs and needle positions, radar polygons, sparkline polyline points and forecast bar geometry. No image or file is produced - the browser draws everything. |
 | **`web_ui`** | `model_service.py` | Python Script | Shared inference layer. Lazy-loads and caches every trained artifact (sensor bundle, EfficientNet-B0, weather CNN), exposes the ESP32 device registry, and resolves farm defaults and report delivery. All deep models run on CPU. |
 | **`web_ui`** | `templates/_charts.html` | Jinja2 Macros | Chart component library: `donut`, `radar`, `rangebars`, `sparkgrid`, `forecast`, `flow` and `suggestions`, composed from HTML, CSS and inline SVG. |
-| **`web_ui`** | `templates/*.html` | Jinja2 Templates | `base.html` (workspace shell: sticky top bar with brand, nav tabs, node status and footer) plus three page templates: overview, vision and advisory. |
-| **`web_ui`** | `static/style.css` | CSS | Workspace design system — design tokens, top bar and nav tabs, metric cards, panel cards, donut, radar, range bars, sparklines, tables, suggestion cards and sliders. The alignment contract is documented in the file header. |
+| **`web_ui`** | `templates/*.html` | Jinja2 Templates | `base.html` (workspace shell: fixed sidebar with brand, four navigation items and a node-status card, plus a sticky top bar with breadcrumb and status pill) plus four page templates: overview, vision (serving both image models) and advisory. |
+| **`web_ui`** | `static/style.css` | CSS | Workspace design system — design tokens, sidebar and top bar, metric cards, panel cards, donut, radar, range bars, sparklines, tables, suggestion cards and sliders. The alignment contract is documented in the file header. |
 | **`web_ui`** | `uploads/` | Runtime Data | Temporary storage for uploaded leaf/sky images; files and the folder are removed after inference to keep the tree tidy. |
 | **`web_ui`** | `README.md` | Documentation | How to install requirements, start the server, what each page shows and the chart component list. |
 
@@ -314,20 +314,28 @@ Key design points:
 
 ## 6. Web Dashboard (`./web_ui/`)
 
-A deliberately small Flask dashboard: three pages, one job each, under one sticky top bar. Models are loaded once and cached (running on CPU), and **every visual is rendered by the browser as HTML, CSS or inline SVG** - no server-side image generation, no matplotlib and no JavaScript charting library. Python only supplies coordinates, percentages and gradient strings through the `viz` helpers:
+A deliberately small Flask dashboard: four pages, one job each, behind a fixed sidebar. Models are loaded once and cached (running on CPU), and **every visual is rendered by the browser as HTML, CSS or inline SVG** - no server-side image generation, no matplotlib and no JavaScript charting library. Python only supplies coordinates, percentages and gradient strings through the `viz` helpers:
 
 | Route | Page | Function |
 | :--- | :--- | :--- |
 | `/` | Overview | Live metrics (crop state, yield, top risk), the disease pie chart, the reading log and the trend sparklines. |
-| `/vision` | Vision | Two image classifiers side by side: leaf disease (EfficientNet-B0) and weather state (weather CNN), each with a confidence donut and top-3 bars. |
+| `/vision/leaf` | Leaf Vision | Leaf disease classification (EfficientNet-B0): upload, top class with a confidence bar, and a class-distribution donut. |
+| `/vision/sky` | Sky Vision | Weather-state classification (weather CNN), same three parts. |
+| `/vision` | Vision | Redirects to `/vision/leaf`. |
 | `/advisory` | Advisory | Slider-driven full pipeline -> ranked actions, the disease pie for the scenario, the feature profile and downloadable markdown/JSON reports. |
 | `POST /api/sensor-data` | Field-node API | Ingests the ESP32 JSON payload, maps it to the 8-feature schema, stores it and returns the crop-state and yield assessment. |
 | `GET /api/devices` | Field-node API | Known nodes with IP address, last reading, measured-feature count and online state. |
 | `GET /api/latest` | Field-node API | Latest reading with mapped features, context signals and measured/estimated provenance; `source: none` until a node reports. |
 
-Consolidation kept the surface small: the sensor simulator, the live-weather page
-and the two vision pages of the first iteration are merged into `/advisory`,
-`/` and `/vision` respectively, so no number appears in two places.
+Consolidation kept the surface small: the sensor simulator and the live-weather
+page of the first iteration are merged into `/` and the advisory run
+respectively, so no number appears in two places. The two image classifiers get a
+page each because they are unrelated models - a leaf photo and a sky photo share
+no inputs, no classes and no advice - and one template serves both, driven by the
+`VISION_MODELS` dict in `web_ui/app.py`. Because both tabs share the `vision`
+endpoint, the sidebar marks the active item by comparing
+`request.view_args['kind']` as well as `request.endpoint`; without the first
+comparison both vision tabs would light up at once.
 
 ### 6.0 Field-Node Data Path
 
@@ -358,8 +366,10 @@ Sensor mapping and provenance rules are documented in
 | `suggestions` | HTML cards | ranked advisory actions with priority badges |
 
 ### 6.2 Design Points
-- **Workspace shell** - no sidebar. A sticky top bar carries the brand, three nav tabs and the node status pill, and a content column is built from metric cards, panel cards, data tables and suggestion lists.
-- **Alignment contract** - the top bar and the content column share one width and one horizontal padding, `.view` applies one uniform vertical gap, cards in a grid row stretch to the tallest, every panel header has one height, and metric captions are pinned to the bottom so they share a baseline. Spacing inside a card uses the `gap-sm` / `gap-md` / `gap-lg` utilities, never an inline margin.
+- **Workspace shell** - a fixed sidebar (brand, navigation, node-status card) beside the content column, and a sticky top bar with breadcrumb and status pill. Cards are metric cards, panel cards, data tables and suggestion lists.
+- **Alignment contract** - `.app-shell` is a two-column grid so the sidebar cannot push the content out of alignment; the top bar and content column share one width and one horizontal padding; `.view` applies one uniform vertical gap; cards in a grid row stretch to the tallest; every panel header has one height; metric captions are pinned to the bottom so they share a baseline. Spacing inside a card uses the `gap-sm` / `gap-md` / `gap-lg` utilities, never an inline margin.
+- **Always-rendered overview** - the metric row, the disease pie chart, the reading log and the trends are rendered unconditionally. With no node reporting they show empty values (`No data`, an em dash, a `No readings logged yet.` row) instead of being swapped for a placeholder screen, so the page under review is the same one that runs in the field. No data is ever invented.
+- **Self-healing refresh** - with no node reporting, the overview polls `GET /api/latest` every 3s and reloads when `source` stops being `none`. It backs off when the tab is hidden and gives up after a bounded number of tries, so the page fills in without a manual refresh and without polling forever. The script is only emitted when nothing is reporting, so a working page never reloads itself.
 - **Aligned rows** - every two-column row uses equal `minmax(0, 1fr)` columns; cards stretch to the tallest card in the row and the panel body fills the leftover height, so card headers, charts and tables line up. Metric cards pin their sub-text to the bottom with `margin-top: auto`.
 - **Slider-based simulator** - the advisory inputs use `input[type=range]` with live readouts and a JS-painted progress track, replacing plain number boxes.
 - **Single inference layer** (`model_service.py`) - every model artifact (sensor `rf_model.joblib`, leaf checkpoint, satellite checkpoint) is loaded lazily into a module-level singleton and reused across requests.

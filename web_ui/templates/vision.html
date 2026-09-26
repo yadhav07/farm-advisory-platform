@@ -1,98 +1,78 @@
 {% extends "base.html" %}
 {% from "_charts.html" import donut %}
 
-{% block title %}Vision · FarmIQ{% endblock %}
-
-{% macro upload_card(kind, title, sub, glyph, tone, result, empty) %}
-<article class="panel-card">
-  <div class="panel-header">
-    <div><span class="panel-kicker">{{ sub }}</span><h2>{{ title }}</h2></div>
-    <span class="card-glyph {{ tone }}"><i class="fa-solid {{ glyph }}"></i></span>
-  </div>
-
-  <div class="panel-body">
-    <form method="post" enctype="multipart/form-data">
-      <input type="hidden" name="model" value="{{ kind }}">
-      <div class="field">
-        <label for="image-{{ kind }}">Photo</label>
-        <input type="file" id="image-{{ kind }}" name="image" accept="image/*" required>
-        <span class="hint">PNG, JPG, JPEG, WebP or BMP</span>
-      </div>
-      <div class="actions">
-        <button type="submit" class="primary-button {{ 'power-button' if tone == 'power' else ('amber-button' if tone == 'cement' else '') }}">
-          <i class="fa-solid fa-magnifying-glass"></i> Classify
-        </button>
-      </div>
-    </form>
-
-    {% if result %}
-      <div class="result-primary gap-lg">
-        <span>Result</span>
-        <strong>{{ result.prediction }}</strong>
-      </div>
-      <div class="benchmark-block gap-md">
-        <div class="benchmark-label"><span>Confidence</span><strong>{{ pct(result.probability) }}</strong></div>
-        <div class="progress-track {{ 'blue' if tone == 'power' else ('amber' if tone == 'cement' else '') }}">
-          <span style="width: {{ (result.probability * 100)|round(1) }}%"></span>
-        </div>
-      </div>
-      <div class="rangebar-list gap-md">
-        {% for item in result.topk[:3] %}
-        <div class="rangebar">
-          <div class="rangebar-head"><span>{{ item.class }}</span><b>{{ pct(item.probability) }}</b></div>
-          <div class="rangebar-track">
-            <span class="rangebar-value" style="width: {{ (item.probability * 100)|round(1) }}%"></span>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <div class="empty">{{ empty }}</div>
-    {% endif %}
-  </div>
-</article>
-{% endmacro %}
+{% block title %}{{ meta.title }} · FarmIQ{% endblock %}
+{% block crumb %}{{ meta.title }}{% endblock %}
 
 {% block content %}
+{# One page per image model. Everything model-specific comes from `meta`, so
+   this template serves both /vision/leaf and /vision/sky unchanged. #}
 <section class="view">
 
   <div class="page-heading">
     <div>
-      <p class="eyebrow">VISION</p>
-      <h1>Classify a photo.</h1>
-      <p>Two image models: leaf disease from a leaf photograph, and weather state from a sky photograph.</p>
+      <p class="eyebrow">{{ meta.title | upper }}</p>
+      <h1>{{ meta.heading }}</h1>
+      <p>{{ meta.blurb }}</p>
     </div>
-    <span class="scope-badge cement"><i class="fa-solid fa-image"></i> Two classifiers</span>
+    <span class="scope-badge {{ meta.tone }}"><i class="fa-solid {{ meta.glyph }}"></i> {{ meta.model }}</span>
   </div>
 
   <div class="grid-2">
-    {{ upload_card('leaf', 'Leaf disease', 'EfficientNet-B0', 'fa-leaf', 'cement', leaf,
-                   'Upload a leaf photo to see the diagnosis.') }}
-    {{ upload_card('sky', 'Weather state', 'Weather CNN', 'fa-cloud-sun', 'power', sky,
-                   'Upload a sky photo to see the state.') }}
+    <article class="panel-card">
+      <div class="panel-header">
+        <div><span class="panel-kicker">UPLOAD</span><h2>{{ meta.title }} photo</h2></div>
+        <span class="card-glyph {{ meta.tone }}"><i class="fa-solid {{ meta.glyph }}"></i></span>
+      </div>
+      <div class="panel-body">
+        <form method="post" enctype="multipart/form-data">
+          <div class="field">
+            <label for="image">Photo</label>
+            <input type="file" id="image" name="image" accept="image/*" required>
+            <span class="hint">PNG, JPG, JPEG, WebP or BMP</span>
+          </div>
+          <div class="actions">
+            <button type="submit" class="primary-button {{ 'power-button' if meta.tone == 'power' else 'amber-button' }}">
+              <i class="fa-solid fa-magnifying-glass"></i> Classify
+            </button>
+          </div>
+        </form>
+      </div>
+    </article>
+
+    <article class="panel-card">
+      <div class="panel-header">
+        <div><span class="panel-kicker">RESULT</span><h2>{{ meta.result_label }}</h2></div>
+        {% if result %}<span class="panel-period">{{ pct(result.probability) }}</span>{% endif %}
+      </div>
+      <div class="panel-body">
+        {% if result %}
+          <div class="result-primary">
+            <span>Top class</span>
+            <strong>{{ result.prediction }}</strong>
+          </div>
+          <div class="benchmark-block">
+            <div class="benchmark-label"><span>Confidence</span><strong>{{ pct(result.probability) }}</strong></div>
+            <div class="progress-track {{ 'blue' if meta.tone == 'power' else 'amber' }}">
+              <span style="width: {{ (result.probability * 100)|round(1) }}%"></span>
+            </div>
+          </div>
+        {% else %}
+          <div class="empty">{{ meta.empty }}</div>
+        {% endif %}
+      </div>
+    </article>
   </div>
 
-  {% if leaf or sky %}
+  {% if result %}
   <article class="panel-card">
     <div class="panel-header">
       <div><span class="panel-kicker">CONFIDENCE</span><h2>Class distribution</h2></div>
+      <span class="panel-period">{{ meta.model }}</span>
     </div>
-    <div class="panel-body">
-      <div class="grid-2">
-        {% if leaf %}
-        <div>
-          <p class="panel-hint">Leaf &mdash; {{ leaf.prediction }}</p>
-          {{ donut(vision_items(leaf.topk), center_value=pct(leaf.probability), center_label=leaf.prediction) }}
-        </div>
-        {% endif %}
-        {% if sky %}
-        <div>
-          <p class="panel-hint">Sky &mdash; {{ sky.prediction }}</p>
-          {{ donut(vision_items(sky.topk), center_value=pct(sky.probability), center_label=sky.prediction) }}
-        </div>
-        {% endif %}
-      </div>
-    </div>
+    {{ donut(vision_items(result.topk),
+             center_value=pct(result.probability),
+             center_label=result.prediction) }}
   </article>
   {% endif %}
 

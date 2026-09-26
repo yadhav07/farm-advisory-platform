@@ -42,11 +42,22 @@ python app.py
 The browser opens automatically at <http://127.0.0.1:5001>. The server binds to
 `0.0.0.0` so field nodes on the same network can reach it.
 
-Three pages: **overview** (live metrics, the disease pie chart, the reading log
-and the trend charts), **vision** (leaf and sky photo classifiers) and
-**advisory** (run the pipeline with live weather, get ranked actions and a
-report). Navigation is three tabs in the top bar; there is no sidebar and no
-simulated node, so the overview stays empty until real hardware reports.
+Four pages behind a sidebar: **overview** (live metrics, the disease pie chart,
+the reading log and the trend charts), **leaf vision** and **sky vision** (the
+two image classifiers, one page each), and **advisory** (run the pipeline with
+live weather, get ranked actions and a report). There is no simulated node: with
+nothing reporting the overview still renders in full, with empty values instead
+of a placeholder screen, and it polls for a node so it fills itself in the
+moment one appears.
+
+| Route | Page |
+| :--- | :--- |
+| `/` | Overview |
+| `/vision/leaf` | Leaf Vision - EfficientNet-B0 disease classification |
+| `/vision/sky` | Sky Vision - weather CNN state classification |
+| `/advisory` | Advisory - full pipeline, ranked actions, report |
+
+Both vision pages share one template; `/vision` redirects to `/vision/leaf`.
 
 ### 3. Connect an ESP32 field node
 
@@ -66,10 +77,11 @@ POST http://<your-pc-ip>:5001/api/sensor-data
 }
 ```
 
-As soon as the node posts, the overview fills in: the top bar shows the node as
-live and the page renders its telemetry through the Random Forest heads. Until
-then the overview shows an empty state naming the endpoint, because the
-dashboard never invents data.
+As soon as the node posts, the overview fills in: the sidebar and the top bar
+both show the node as live and the page renders its telemetry through the
+Random Forest heads. Until then the overview shows an empty state naming the
+endpoint, because the dashboard never invents data - and it checks for a node on
+its own, so there is nothing to reload.
 
 To see it working without hardware, post a reading by hand:
 

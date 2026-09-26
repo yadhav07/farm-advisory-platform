@@ -4,12 +4,16 @@
    HTML / CSS / inline SVG so there is no charting dependency.
 
    Layout contract (this is what keeps everything aligned):
-   * .topbar-inner and .content-wrap share the same max width and the same
-     horizontal padding, so their left and right edges line up exactly.
-   * .view is a single-column flex with one uniform gap, so every card row on
-     every page is separated by the same space. No ad-hoc margins.
-   * Cards inside a grid row stretch to the tallest card, and the panel body
-     claims the leftover height, so headers, charts and tables line up.
+   * .app-shell is a two-column grid: a fixed-width sidebar and the content
+     column. The sidebar and the content column are independent, so the
+     sidebar can never push the cards out of alignment.
+   * Inside the content column, .topbar-inner and .content-wrap share the
+     same max width and the same horizontal padding, so the top bar and
+     every card start at exactly the same x position.
+   * .view is a single-column flex with one uniform gap, so every card row
+     on every page is separated by the same space. No ad-hoc margins.
+   * Cards inside a grid row stretch to the tallest card, and the panel
+     body claims the leftover height, so headers, charts and tables line up.
    * .panel-header has one fixed height everywhere, so card content always
      starts on the same baseline.
    ========================================================================== */
@@ -32,14 +36,17 @@
     --amber-soft: #fff5e6;
     --blue: #2878d0;
     --blue-soft: #edf5fd;
+    --violet: #6b4fc4;
+    --violet-soft: #f2effc;
     --danger: #c43d3d;
     --danger-soft: #fff0f0;
     --shadow-sm: 0 1px 2px rgba(19, 36, 27, 0.03), 0 5px 16px rgba(19, 36, 27, 0.035);
     --radius-sm: 10px;
     --radius: 16px;
     --gutter: 16px;
+    --nav-w: 264px;
     --shell-width: 1500px;
-    --shell-pad: clamp(24px, 3vw, 48px);
+    --shell-pad: clamp(24px, 3vw, 44px);
     --header-h: 72px;
     --font: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -49,8 +56,6 @@
 body {
     min-width: 320px;
     min-height: 100vh;
-    display: flex;
-    flex-direction: column;
     background: var(--canvas);
     color: var(--text);
     font-family: var(--font);
@@ -69,9 +74,115 @@ a { color: inherit; text-decoration: none; }
 ::-webkit-scrollbar-thumb { background: #cfd8d2; border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: #b7c4bc; }
 
+/* ------------------------------------------------------------- app shell */
+.app-shell {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: var(--nav-w) minmax(0, 1fr);
+}
+
+.main-shell {
+    min-width: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ---------------------------------------------------------------- sidebar */
+.sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 24px 16px 16px;
+    background: var(--surface);
+    border-right: 1px solid var(--line);
+}
+
+.sidebar-brand { display: flex; align-items: center; gap: 11px; padding: 0 6px; }
+
+.brand-mark {
+    width: 38px; height: 38px;
+    display: grid; place-items: center; flex: 0 0 38px;
+    color: #fff; background: var(--green);
+    border-radius: 12px; font-size: 13px;
+    box-shadow: 0 6px 14px rgba(24, 121, 78, 0.2);
+}
+.sidebar-brand > div { min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.sidebar-brand strong { font-size: 15px; font-weight: 800; letter-spacing: -0.4px; }
+.sidebar-brand span:not(.brand-mark) { margin-top: 3px; color: var(--muted); font-size: 9px; font-weight: 700; }
+
+.nav-label {
+    margin: 28px 8px 10px;
+    color: #9aa69f; font-size: 9px; font-weight: 800;
+    letter-spacing: 1.4px; text-transform: uppercase;
+}
+
+.sidebar-nav { display: flex; flex-direction: column; gap: 4px; }
+
+.sidebar-nav-btn {
+    position: relative;
+    width: 100%;
+    min-height: 58px;
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) 14px;
+    align-items: center;
+    gap: 11px;
+    padding: 9px 11px;
+    color: var(--text-soft);
+    border: 1px solid transparent;
+    border-radius: 13px;
+    text-align: left;
+    transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+.sidebar-nav-btn:hover { color: var(--text); background: var(--surface-soft); }
+.sidebar-nav-btn.active { color: var(--text); background: var(--green-softer); border-color: #dcebe2; }
+
+/* The active marker is inset rather than hung off the edge, so it can never
+   be clipped by the sidebar padding. */
+.sidebar-nav-btn.active::before {
+    content: "";
+    position: absolute;
+    top: 14px; bottom: 14px; left: 0;
+    width: 3px; border-radius: 0 4px 4px 0;
+    background: var(--green);
+}
+
+.nav-icon { width: 38px; height: 38px; display: grid; place-items: center; flex: 0 0 38px; border-radius: 11px; font-size: 13px; }
+.nav-icon-total { color: var(--green); background: var(--green-soft); }
+.nav-icon-cement { color: var(--amber); background: var(--amber-soft); }
+.nav-icon-power { color: var(--blue); background: var(--blue-soft); }
+.nav-icon-violet { color: var(--violet); background: var(--violet-soft); }
+
+.nav-copy { min-width: 0; display: flex; flex-direction: column; }
+.nav-copy strong { overflow: hidden; font-size: 12px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.nav-copy small { margin-top: 2px; overflow: hidden; color: var(--muted); font-size: 9px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.nav-arrow { color: #a4afa9; font-size: 8px; transition: transform 160ms ease, color 160ms ease; }
+.sidebar-nav-btn.active .nav-arrow { color: var(--green); transform: translateX(2px); }
+
+.sidebar-spacer { flex: 1; }
+
+/* Node status. Real hardware only: there is no simulated branch. */
+.node-card {
+    display: flex; align-items: center; gap: 10px;
+    margin: 12px 2px;
+    padding: 11px;
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+}
+.node-card > div { min-width: 0; display: flex; flex-direction: column; }
+.node-card strong { font-size: 10px; font-weight: 800; }
+.node-card span:not(.status-icon) { margin-top: 2px; overflow: hidden; color: var(--muted); font-size: 8.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+
+.status-icon { width: 30px; height: 30px; display: grid; place-items: center; flex: 0 0 30px; border-radius: 9px; font-size: 11px; }
+.status-icon.live { color: var(--green); background: var(--green-soft); }
+.status-icon.idle { color: var(--amber); background: var(--amber-soft); }
+.status-icon.off { color: var(--muted); background: var(--surface-muted); }
+
 /* ----------------------------------------------------------------- topbar */
-/* The top bar and the content below it share one width and one padding, so
-   the brand, the tabs and every card start at exactly the same x position. */
 .topbar {
     position: sticky;
     top: 0;
@@ -82,45 +193,27 @@ a { color: inherit; text-decoration: none; }
     -webkit-backdrop-filter: blur(14px);
 }
 
+/* Same width and padding as .content-wrap, so both align on the same edges. */
 .topbar-inner {
     width: min(100%, var(--shell-width));
-    min-height: 68px;
+    min-height: 66px;
     margin: 0 auto;
     padding: 0 var(--shell-pad);
     display: flex;
     align-items: center;
-    gap: clamp(16px, 2.4vw, 34px);
+    justify-content: space-between;
+    gap: 18px;
 }
 
-.brand { display: flex; align-items: center; gap: 11px; flex: 0 0 auto; }
+.breadcrumbs { display: flex; align-items: center; gap: 9px; min-width: 0; color: #97a29c; font-size: 10px; font-weight: 600; }
+.breadcrumbs i { font-size: 7px; }
+.breadcrumbs strong { color: var(--text-soft); font-weight: 800; }
 
-.brand-mark {
-    width: 36px; height: 36px;
-    display: grid; place-items: center; flex: 0 0 36px;
-    color: #fff; background: var(--green);
-    border-radius: 11px; font-size: 13px;
-    box-shadow: 0 6px 14px rgba(24, 121, 78, 0.2);
-}
-.brand strong { font-size: 15px; font-weight: 800; letter-spacing: -0.4px; }
-
-.topnav { display: flex; align-items: center; gap: 4px; min-width: 0; }
-
-.topnav-btn {
-    display: inline-flex; align-items: center; gap: 8px;
-    min-height: 36px; padding: 0 14px;
-    color: var(--muted); border-radius: 10px;
-    font-size: 11px; font-weight: 700; white-space: nowrap;
-    transition: color 160ms ease, background 160ms ease;
-}
-.topnav-btn i { font-size: 10px; }
-.topnav-btn:hover { color: var(--text); background: var(--surface-soft); }
-.topnav-btn.active { color: var(--green-dark); background: var(--green-soft); }
-
-.topbar-actions { margin-left: auto; display: flex; align-items: center; }
+.topbar-actions { display: flex; align-items: center; gap: 14px; flex: 0 0 auto; }
 
 .live-status {
     display: inline-flex; align-items: center; gap: 7px;
-    min-height: 32px; padding: 0 12px;
+    min-height: 32px; padding: 0 12px; flex: 0 0 auto;
     color: #4d665a; background: var(--green-softer);
     border: 1px solid #dfece4; border-radius: 999px;
     font-size: 9px; font-weight: 700; white-space: nowrap;
@@ -138,24 +231,19 @@ a { color: inherit; text-decoration: none; }
     width: min(100%, var(--shell-width));
     flex: 1;
     margin: 0 auto;
-    padding: 32px var(--shell-pad) 26px;
+    padding: 30px var(--shell-pad) 26px;
 }
 
 /* One uniform vertical rhythm for every row on every page. */
 .view { display: flex; flex-direction: column; gap: var(--gutter); }
 
-.page-heading {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 24px;
-}
+.page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .page-heading > div:first-child { min-width: 0; max-width: 760px; }
 
 .eyebrow, .panel-kicker { color: var(--green); font-size: 10px; font-weight: 800; letter-spacing: 1.3px; }
 .page-heading h1 { margin-top: 7px; font-size: 34px; line-height: 1.12; letter-spacing: -1.5px; }
 .page-heading > div > p:last-child { margin-top: 10px; color: var(--muted); font-size: 12px; line-height: 1.7; }
-.page-heading code, .panel-body code, .empty code {
+.page-heading code, .panel-body code {
     padding: 2px 6px; color: var(--green-dark);
     background: var(--green-soft); border-radius: 5px;
     font-family: Consolas, "SF Mono", monospace; font-size: 0.92em;
@@ -179,6 +267,7 @@ a { color: inherit; text-decoration: none; }
 }
 .scope-badge.green { color: var(--green-dark); background: var(--green-soft); border: 1px solid #d5eadd; }
 .scope-badge.cement { color: #9a5407; background: var(--amber-soft); border: 1px solid #f3dfc4; }
+.scope-badge.power { color: #2366b5; background: var(--blue-soft); border: 1px solid #d7e7f7; }
 
 /* ----------------------------------------------------------- metric cards */
 .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--gutter); }
@@ -465,13 +554,6 @@ input:focus { border-color: var(--green); box-shadow: 0 0 0 4px rgba(24, 121, 78
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: var(--gutter); }
 .actions.flush { margin-top: 0; }
 
-.payload-pre {
-    margin: 0; padding: 16px 18px;
-    color: #cfe6d8; background: #1c2620;
-    border-radius: 12px; overflow: auto;
-    font-family: Consolas, "SF Mono", monospace; font-size: 9.5px; line-height: 1.7;
-}
-
 /* --------------------------------------------------------------- footer */
 .app-footer {
     display: flex; align-items: center; justify-content: space-between;
@@ -486,16 +568,34 @@ input:focus { border-color: var(--green); box-shadow: 0 0 0 4px rgba(24, 121, 78
     .suggestion-list { grid-template-columns: minmax(0, 1fr); }
 }
 
+/* Below this the sidebar becomes a horizontal bar at the top of the page.
+   It is deliberately not sticky, so the top bar keeps top: 0 and there is
+   no double-sticky offset to get wrong. */
+@media (max-width: 980px) {
+    .app-shell { grid-template-columns: minmax(0, 1fr); }
+    .sidebar {
+        position: static; height: auto;
+        display: grid; grid-template-columns: auto minmax(0, 1fr);
+        align-items: center; gap: 16px;
+        padding: 10px var(--shell-pad);
+        border-right: 0; border-bottom: 1px solid var(--line);
+    }
+    .sidebar-brand { padding: 0; }
+    .sidebar-brand > div, .nav-label, .sidebar-spacer, .node-card, .nav-arrow { display: none; }
+    .sidebar-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+    .sidebar-nav-btn { min-height: 44px; grid-template-columns: 32px minmax(0, 1fr); gap: 9px; padding: 6px 9px; border-radius: 11px; }
+    .sidebar-nav-btn.active::before { top: auto; right: 12px; bottom: -10px; left: 12px; width: auto; height: 2px; border-radius: 4px 4px 0 0; }
+    .nav-icon { width: 32px; height: 32px; flex-basis: 32px; border-radius: 10px; font-size: 11px; }
+    .nav-copy small { display: none; }
+    .nav-copy strong { font-size: 10px; }
+}
+
 @media (max-width: 860px) {
-    .topbar-inner { min-height: 0; flex-wrap: wrap; padding-top: 12px; padding-bottom: 12px; gap: 12px; }
-    .topnav { order: 3; width: 100%; overflow-x: auto; }
-    .topbar-actions { margin-left: auto; }
     .controls-body { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 680px) {
     :root { --gutter: 12px; }
-    .topnav-btn { padding: 0 11px; font-size: 10px; }
     .page-heading { align-items: flex-start; flex-direction: column; }
     .heading-note, .scope-badge { align-self: stretch; justify-content: center; }
     .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -507,11 +607,14 @@ input:focus { border-color: var(--green); box-shadow: 0 0 0 4px rgba(24, 121, 78
     .suggestion-item { grid-template-columns: 34px minmax(0, 1fr); }
     .suggestion-impact { grid-column: 2; justify-content: flex-start; }
     .app-footer { align-items: flex-start; flex-direction: column; gap: 5px; }
+    .breadcrumbs > span, .breadcrumbs > i { display: none; }
 }
 
 @media (max-width: 420px) {
     .metric-grid { grid-template-columns: minmax(0, 1fr); }
-    .brand strong { display: none; }
+    .sidebar-nav-btn { grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 5px; }
+    .nav-icon { display: none; }
+    .nav-copy strong { font-size: 9px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -524,5 +627,5 @@ input:focus { border-color: var(--green); box-shadow: 0 0 0 4px rgba(24, 121, 78
 }
 
 @media print {
-    .topbar, .app-footer { display: none; }
+    .sidebar, .topbar, .app-footer { display: none; }
 }
