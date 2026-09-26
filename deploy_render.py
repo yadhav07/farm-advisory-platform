@@ -36,7 +36,9 @@ import urllib.request
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 API = 'https://api.render.com/v1'
-REPO = 'github.com/yadhav07/farm-advisory-platform'
+# The API wants the full https URL; a bare "github.com/owner/repo" is rejected
+# with "repository URL is invalid or unfetchable".
+REPO = 'https://github.com/yadhav07/farm-advisory-platform'
 NAME = 'farm-advisory-platform'
 KEY = os.environ.get('RENDER_API_KEY', '').strip()
 
@@ -122,15 +124,19 @@ def main():
             'repo': REPO,
             'branch': 'main',
             'type': 'web_service',
+            'runtime': 'python',
             'serviceDetails': {
                 'runtime': 'python',
                 'plan': 'free',
-                'buildCommand': BUILD,
-                'startCommand': START,
-                'envVars': [
-                    {'key': 'PYTHON_VERSION', 'value': '3.12'},
-                    {'key': 'THREADS', 'value': '4'},
-                ],
+                'envSpecificDetails': {
+                    'runtime': 'python',
+                    'buildCommand': BUILD,
+                    'startCommand': START,
+                    'envVars': [
+                        {'key': 'PYTHON_VERSION', 'value': '3.12'},
+                        {'key': 'THREADS', 'value': '4'},
+                    ],
+                },
             },
             'healthCheckPath': '/healthz',
         })

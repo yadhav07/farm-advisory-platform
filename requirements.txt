@@ -14,6 +14,10 @@
 
 flask==3.1.3
 waitress==3.0.2
+# gunicorn is what the Procfile, render.yaml and the Render start command
+# actually invoke. Without it the container starts and exits 127
+# ("command not found") even though the build itself succeeded.
+gunicorn==23.0.0
 
 # Inference
 torch==2.13.0
