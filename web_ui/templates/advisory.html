@@ -1,31 +1,31 @@
 {% extends "base.html" %}
-{% from "_charts.html" import donut, gauge, suggestions, flow %}
+{% from "_charts.html" import donut, suggestions, radar, rangebars %}
 
 {% block title %}Advisory · FarmIQ{% endblock %}
-{% block crumb %}Advisory engine{% endblock %}
+{% block crumb %}Advisory{% endblock %}
 
 {% block content %}
 <section class="view">
 
   <div class="page-heading">
     <div>
-      <p class="eyebrow">ADVISORY ENGINE</p>
-      <h1>Turn readings into actions.</h1>
+      <p class="eyebrow">ADVISORY</p>
+      <h1>What to do in the field.</h1>
       <p>
-        Sensor telemetry, optional leaf and sky photographs and live weather are
-        fused into ranked agronomic actions with a written rationale.
+        Adjust the telemetry, add a photo or live weather if you like, and get ranked
+        actions with the reasoning behind each one.
       </p>
     </div>
     <span class="scope-badge {{ 'green' if result else 'cement' }}">
       <i class="fa-solid fa-lightbulb"></i>
-      {{ result.recommendations|length ~ ' action' ~ ('' if result.recommendations|length == 1 else 's') if result else 'Ready' }}
+      {{ (result.recommendations|length ~ ' action' ~ ('' if result.recommendations|length == 1 else 's')) if result else 'Ready' }}
     </span>
   </div>
 
   <form method="post" enctype="multipart/form-data">
-    <div class="panel-card">
+    <article class="panel-card">
       <div class="panel-header">
-        <div><span class="panel-kicker">ADVISORY INPUTS</span><h2>Telemetry, photos and weather</h2></div>
+        <div><span class="panel-kicker">INPUTS</span><h2>Telemetry, photo and weather</h2></div>
         <a class="secondary-button" href="{{ url_for('advisory') }}"><i class="fa-solid fa-rotate-left"></i> Reset</a>
       </div>
       <div class="panel-body">
@@ -48,42 +48,40 @@
             <div class="range-scale"><span>{{ f.low }}</span><span>{{ f.high }}</span></div>
           </div>
           {% endfor %}
+        </div>
 
-          <div class="control-group" style="grid-column:1 / -1;">
-            <div class="form-grid">
-              <div class="field">
-                <label for="leaf_image">Leaf photograph <em>(optional)</em></label>
-                <input type="file" id="leaf_image" name="leaf_image" accept="image/*">
-              </div>
-              <div class="field">
-                <label for="sky_image">Sky photograph <em>(optional)</em></label>
-                <input type="file" id="sky_image" name="sky_image" accept="image/*">
-              </div>
-            </div>
+        <div class="form-grid" style="margin-top:18px;">
+          <div class="field">
+            <label for="leaf_image">Leaf photo <em>(optional)</em></label>
+            <input type="file" id="leaf_image" name="leaf_image" accept="image/*">
+          </div>
+          <div class="field">
+            <label for="sky_image">Sky photo <em>(optional)</em></label>
+            <input type="file" id="sky_image" name="sky_image" accept="image/*">
+          </div>
+        </div>
 
-            <label class="checkbox-row" for="use_weather" style="margin-top:16px;">
-              <input type="checkbox" id="use_weather" name="use_weather" {{ 'checked' if use_weather }}>
-              <span>Include live weather in the advisory</span>
-            </label>
+        <label class="checkbox-row" for="use_weather" style="margin-top:16px;">
+          <input type="checkbox" id="use_weather" name="use_weather" {{ 'checked' if use_weather }}>
+          <span>Include live weather</span>
+        </label>
 
-            <div class="form-grid" id="weather-fields" style="{{ '' if use_weather else 'display:none;' }}">
-              <div class="field">
-                <label for="latitude">Latitude</label>
-                <input type="number" id="latitude" name="latitude" step="0.0001" value="{{ latitude or '' }}" placeholder="farm default">
-              </div>
-              <div class="field">
-                <label for="longitude">Longitude</label>
-                <input type="number" id="longitude" name="longitude" step="0.0001" value="{{ longitude or '' }}" placeholder="farm default">
-              </div>
-            </div>
+        <div class="form-grid" id="weather-fields" style="{{ '' if use_weather else 'display:none;' }}">
+          <div class="field">
+            <label for="latitude">Latitude</label>
+            <input type="number" id="latitude" name="latitude" step="0.0001" value="{{ latitude or '' }}" placeholder="farm default">
+          </div>
+          <div class="field">
+            <label for="longitude">Longitude</label>
+            <input type="number" id="longitude" name="longitude" step="0.0001" value="{{ longitude or '' }}" placeholder="farm default">
           </div>
         </div>
 
         <div class="actions">
-          <button type="submit" class="primary-button"><i class="fa-solid fa-play"></i> Run advisory pipeline</button>
+          <button type="submit" class="primary-button"><i class="fa-solid fa-play"></i> Run advisory</button>
         </div>
       </div>
-    </div>
+    </article>
   </form>
 
   {% if result %}
@@ -93,13 +91,13 @@
         <span>Crop state</span>
         <span class="metric-icon metric-icon-total"><i class="fa-solid fa-wheat-awn"></i></span>
       </div>
-      <strong class="metric-value" style="font-size:clamp(21px,2vw,27px);">{{ result.sensor.disease_prediction }}</strong>
-      <p>node {{ result.node_id }} &middot; {{ result.crop }}</p>
+      <strong class="metric-value" style="font-size:clamp(20px,1.9vw,26px);">{{ result.sensor.disease_prediction }}</strong>
+      <p>{{ result.crop }} scenario</p>
     </article>
     <article class="metric-card">
-      <div class="metric-topline"><span>Yield_Rate</span><span class="metric-icon metric-icon-save"><i class="fa-solid fa-seedling"></i></span></div>
+      <div class="metric-topline"><span>Yield forecast</span><span class="metric-icon metric-icon-save"><i class="fa-solid fa-seedling"></i></span></div>
       <strong class="metric-value">{{ fmt(result.sensor.yield_forecast) }}<small>/100</small></strong>
-      <p>regressor forecast</p>
+      <p>regressor output</p>
     </article>
     <article class="metric-card metric-card-amber">
       <div class="metric-topline"><span>Actions</span><span class="metric-icon metric-icon-amber"><i class="fa-solid fa-list-check"></i></span></div>
@@ -115,97 +113,64 @@
     {% endif %}
   </div>
 
-  <div class="alert info" style="margin-top:16px;">
-    <i class="fa-solid fa-circle-info"></i><span>{{ result.summary }}</span>
-  </div>
-
-  <div class="overview-visual-grid" style="margin-top:16px;">
-    <article class="panel-card">
-      <div class="panel-header">
-        <div><span class="panel-kicker">PRIORITY MIX</span><h2>Action breakdown</h2></div>
-        <span class="panel-period">Fusion engine</span>
-      </div>
-      {% set prio = priority_summary(result.recommendations) %}
-      {% if prio.total %}
-        {{ donut(prio.pairs, colors=prio.colors,
-                 center_value=prio.total|string, center_label='actions') }}
-      {% else %}
-        <div class="empty">No actions required. Keep the current management plan.</div>
-      {% endif %}
-    </article>
-
-    <article class="panel-card">
-      <div class="panel-header">
-        <div><span class="panel-kicker">CLASSIFIER</span><h2>Disease split</h2></div>
-        <span class="panel-period">Random Forest</span>
-      </div>
-      {{ donut(disease_items(result.sensor.disease_probabilities),
-               center_value=pct(result.sensor.disease_probabilities[result.sensor.disease_prediction]),
-               center_label=result.sensor.disease_prediction) }}
-    </article>
-  </div>
-
   <article class="panel-card">
     <div class="panel-header">
-      <div><span class="panel-kicker">RECOMMENDED NEXT STEPS</span><h2>What to do in the field</h2></div>
+      <div><span class="panel-kicker">WHAT TO DO</span><h2>Recommended actions</h2></div>
       <span class="panel-period">{{ result.recommendations|length }} actions</span>
     </div>
     {% if result.recommendations %}
       {{ suggestions(result.recommendations) }}
     {% else %}
-      <div class="empty">No urgent actions required. Keep the current management plan.</div>
+      <div class="empty">No actions required. Keep the current management plan.</div>
     {% endif %}
   </article>
 
   <div class="overview-visual-grid">
     <article class="panel-card">
       <div class="panel-header">
-        <div><span class="panel-kicker">YIELD OUTLOOK</span><h2>Yield_Rate forecast</h2></div>
-        <span class="panel-period">Regression</span>
+        <div><span class="panel-kicker">CLASSIFIER</span><h2>Disease split for this scenario</h2></div>
+        {% set prio = priority_summary(result.recommendations) %}
+        {% if prio.total %}
+        <span class="panel-period">{{ prio.total }} actions</span>
+        {% endif %}
       </div>
-      <div class="panel-body">{{ gauge(result.sensor.yield_forecast) }}</div>
+      {{ donut(disease_items(result.sensor.disease_probabilities),
+               center_value=pct(result.sensor.disease_probabilities[result.sensor.disease_prediction]),
+               center_label=result.sensor.disease_prediction) }}
     </article>
 
     <article class="panel-card">
       <div class="panel-header">
-        <div><span class="panel-kicker">REPORT</span><h2>Download the analysis</h2></div>
-        <i class="fa-solid fa-file-arrow-down panel-header-icon"></i>
+        <div><span class="panel-kicker">READING</span><h2>Feature profile</h2></div>
+        <i class="fa-solid fa-radar panel-header-icon"></i>
       </div>
       <div class="panel-body">
-        {% if report_links %}
-          <p class="panel-hint">
-            The full analysis was written to <code>farm_advisory/outputs/</code>.
-          </p>
-          <div class="actions" style="margin-top:0;">
-            <a class="primary-button" href="{{ url_for('advisory_report', filename=report_links.markdown) }}">
-              <i class="fa-solid fa-file-lines"></i> Markdown
-            </a>
-            <a class="secondary-button" href="{{ url_for('advisory_report', filename=report_links.json) }}">
-              <i class="fa-solid fa-file-code"></i> JSON
-            </a>
-          </div>
-        {% else %}
-          <div class="empty">Run the pipeline to generate a downloadable report.</div>
-        {% endif %}
+        <div class="split-2">
+          {{ radar(values, fields) }}
+          {{ rangebars(values, fields) }}
+        </div>
       </div>
     </article>
   </div>
 
-  {% set lane = [
-    {'input_label': 'Telemetry', 'input_value': '8 features',
-     'input_icon': 'green', 'input_glyph': 'fa-tower-broadcast', 'input_active': true},
-    {'input_label': 'Weather', 'input_value': 'open-meteo' if result.weather else 'cached',
-     'input_icon': 'power', 'input_glyph': 'fa-wind',
-     'process_label': 'Rule engine', 'process_value': 'thresholds',
-     'process_icon': 'cement', 'process_glyph': 'fa-list-check',
-     'output_label': 'Actions', 'output_value': result.recommendations|length|string ~ ' ranked'}
-  ] %}
+  {% if report_links %}
   <article class="panel-card">
     <div class="panel-header">
-      <div><span class="panel-kicker">PROCESS MAP</span><h2>Pipeline executed</h2></div>
+      <div><span class="panel-kicker">REPORT</span><h2>Download the analysis</h2></div>
+      <i class="fa-solid fa-file-arrow-down panel-header-icon"></i>
     </div>
-    {{ flow(lane) }}
+    <div class="panel-body">
+      <div class="actions" style="margin:0;">
+        <a class="primary-button" href="{{ url_for('advisory_report', filename=report_links.markdown) }}">
+          <i class="fa-solid fa-file-lines"></i> Markdown
+        </a>
+        <a class="secondary-button" href="{{ url_for('advisory_report', filename=report_links.json) }}">
+          <i class="fa-solid fa-file-code"></i> JSON
+        </a>
+      </div>
+    </div>
   </article>
+  {% endif %}
   {% endif %}
 
 </section>

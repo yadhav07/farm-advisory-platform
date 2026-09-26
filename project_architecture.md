@@ -115,9 +115,9 @@ Multidisciplinary_Project/
 | **`web_ui`** | `app.py` | Python Script | Flask application. Serves the dashboard pages, registers the `viz` helpers as Jinja globals, and serves downloadable advisory reports from `farm_advisory/outputs/`. |
 | **`web_ui`** | `viz.py` | Python Script | Geometry-only chart helpers. Builds CSS `conic-gradient` donuts, gauge arcs and needle positions, radar polygons, sparkline polyline points and forecast bar geometry. No image or file is produced - the browser draws everything. |
 | **`web_ui`** | `model_service.py` | Python Script | Shared inference layer. Lazy-loads and caches every trained artifact (sensor bundle, EfficientNet-B0, weather CNN), reads the logged telemetry history, produces live simulated-node readings, and resolves farm defaults and report delivery. All deep models run on CPU. |
-| **`web_ui`** | `templates/_charts.html` | Jinja2 Macros | Chart component library: `donut`, `gauge`, `radar`, `rangebars`, `sparkgrid`, `forecast`, `flow` and `suggestions`, composed from HTML, CSS and inline SVG. |
-| **`web_ui`** | `templates/*.html` | Jinja2 Templates | `base.html` (workspace shell: sidebar, top bar, footer) plus per-page templates for overview, field node, sensor, leaf, sky, weather and advisory. |
-| **`web_ui`** | `static/style.css` | CSS | Workspace design system — design tokens, sidebar and top bar, metric cards, panel cards, flow lanes, donut, gauge, radar, range bars, sparklines, forecast columns, tables, suggestion cards, sliders and toasts. |
+| **`web_ui`** | `templates/_charts.html` | Jinja2 Macros | Chart component library: `donut`, `radar`, `rangebars`, `sparkgrid`, `forecast`, `flow` and `suggestions`, composed from HTML, CSS and inline SVG. |
+| **`web_ui`** | `templates/*.html` | Jinja2 Templates | `base.html` (workspace shell: sidebar, top bar, footer) plus four page templates: overview, field node, vision and advisory. |
+| **`web_ui`** | `static/style.css` | CSS | Workspace design system — design tokens, sidebar and top bar, metric cards, panel cards, flow lanes, donut, radar, range bars, sparklines, forecast columns, tables, suggestion cards and sliders. |
 | **`web_ui`** | `uploads/` | Runtime Data | Temporary storage for uploaded leaf/sky images; files and the folder are removed after inference to keep the tree tidy. |
 | **`web_ui`** | `README.md` | Documentation | How to install requirements, start the server, what each page shows and the chart component list. |
 
@@ -314,20 +314,21 @@ Key design points:
 
 ## 6. Web Dashboard (`./web_ui/`)
 
-A Flask dashboard over every trained subsystem. Models are loaded once and cached (running on CPU), and **every visual is rendered by the browser as HTML, CSS or inline SVG** - there is no server-side image generation, no matplotlib and no JavaScript charting library. Python only supplies coordinates, percentages and gradient strings through the `viz` helpers:
+A deliberately small Flask dashboard: four pages, one job each. Models are loaded once and cached (running on CPU), and **every visual is rendered by the browser as HTML, CSS or inline SVG** - no server-side image generation, no matplotlib and no JavaScript charting library. Python only supplies coordinates, percentages and gradient strings through the `viz` helpers:
 
 | Route | Page | Function |
 | :--- | :--- | :--- |
-| `/` | Overview | Live field-node (or simulated) telemetry through the Random Forest heads, KPI tiles, disease donut, yield gauge, profile radar, forecast columns, telemetry history and the pipeline flowchart. |
-| `/device` | Field node | IP-address connection panel, reachability probe, known-node table with online/idle state, latest reading and the firmware payload contract. |
+| `/` | Overview | Live metrics (crop state, yield, top risk), the disease pie chart, the reading log, trend sparklines, the pipeline lanes and the three-day weather outlook. |
+| `/device` | Field node | IP-address connection panel, reachability probe, latest reading, known-node table and the firmware payload contract. |
+| `/vision` | Vision | Two image classifiers side by side: leaf disease (EfficientNet-B0) and weather state (weather CNN), each with a confidence donut and top-3 bars. |
+| `/advisory` | Advisory | Slider-driven full pipeline -> ranked actions, the disease pie for the scenario, the feature profile and downloadable markdown/JSON reports. |
 | `POST /api/sensor-data` | Field-node API | Ingests the ESP32 JSON payload, maps it to the 8-feature schema, stores it and returns the crop-state and yield assessment. |
 | `GET /api/devices` | Field-node API | Known nodes with IP address, last reading, measured-feature count and online state. |
 | `GET /api/latest` | Field-node API | Latest reading (device or simulated) with mapped features, context signals and measured/estimated provenance. |
-| `/sensor` | Sensor analytics | 8-field telemetry (live by default, custom on submit) -> disease donut, yield gauge, profile radar and per-feature range bars. |
-| `/leaf` | Leaf vision | Image upload -> EfficientNet-B0 diagnosis with a confidence donut and top-k bars. |
-| `/satellite` | Sky vision | Image upload -> weather-state CNN classification with a confidence donut. |
-| `/weather` | Weather | Live conditions as KPI tiles plus a 3-day forecast column chart. |
-| `/advisory` | Advisory | Full pipeline -> priority-mix donut, disease donut, yield gauge, ranked action cards and downloadable markdown/JSON reports from `farm_advisory/outputs/`. |
+
+Consolidation kept the surface small: the sensor simulator, the live-weather page
+and the two vision pages of the first iteration are merged into `/advisory`,
+`/` and `/vision` respectively, so no number appears in two places.
 
 ### 6.0 Field-Node Data Path
 
@@ -351,38 +352,24 @@ Sensor mapping and provenance rules are documented in
 
 | Component | Technique | Visual |
 | :--- | :--- | :--- |
-| `donut` | CSS `conic-gradient` with a masked centre | disease probabilities, classifier confidence, advisory priority mix |
-| `gauge` | inline SVG arc with `stroke-dasharray` + needle line | Yield_Rate forecast |
+| `donut` | CSS `conic-gradient` with a masked centre | disease probabilities, classifier confidence |
 | `radar` | inline SVG polygons, rings and axes | sensor profile against the ideal midpoint |
 | `rangebars` | HTML/CSS bars over a track | reading position inside each admissible range |
-| `sparkgrid` | inline SVG polylines | small-multiple telemetry time series |
+| `sparkgrid` | inline SVG polylines | telemetry trends |
 | `forecast` | HTML/CSS positioned columns | 3-day temperature range and precipitation |
-| `flow` | HTML/CSS nodes with arrow connectors | signal-flow lanes (inputs → model → output) |
+| `flow` | HTML/CSS nodes with arrow connectors | signal-flow lanes (input to model to output) |
 | `suggestions` | HTML cards | ranked advisory actions with priority badges |
 
 ### 6.2 Design Points
-- **Workspace shell** - a fixed sidebar (brand, grouped navigation, node status card), a sticky top bar with breadcrumbs and live-node state, and a content column built from metric cards, panel cards, data tables and suggestion lists.
-- **Slider-based simulators** - the sensor and advisory inputs use `input[type=range]` with live readouts and a JS-painted progress track, replacing plain number boxes.
+- **Workspace shell** - a fixed sidebar (brand, navigation, node status card), a sticky top bar with breadcrumbs and live-node state, and a content column built from metric cards, panel cards, data tables and suggestion lists.
+- **Slider-based simulator** - the advisory inputs use `input[type=range]` with live readouts and a JS-painted progress track, replacing plain number boxes.
 - **Single inference layer** (`model_service.py`) - every model artifact (sensor `rf_model.joblib`, leaf checkpoint, satellite checkpoint) is loaded lazily into a module-level singleton and reused across requests.
-- **Geometry-only Python** (`viz.py`) - pure functions for donut gradients, gauge arcs, radar polygons, sparkline points, forecast bars and history statistics, registered as Jinja globals. Nothing is rasterised.
+- **Geometry-only Python** (`viz.py`) - pure functions for donut gradients, radar polygons, sparkline points, forecast bars and history statistics, registered as Jinja globals. Nothing is rasterised.
 - **Reusable macros** - `_charts.html` exposes every visual as a Jinja macro, so pages compose charts declaratively and the markup stays semantic and accessible (`role="img"`, `aria-label`).
 - **Typography and icons** - Manrope and Font Awesome load from a CDN; charts have no external dependency and the layout degrades cleanly if the font or icon set fails to load.
 - **Clean runtime behaviour** - uploaded images are saved to `uploads/` with a unique name, processed, then removed so the repository stays tidy.
 - **Report downloads** are served through a validated route (`secure_filename`) with no filesystem traversal risk.
 - The Flask development server is intended for local/demo use; production deployments should run it behind a WSGI server such as `waitress` or `gunicorn`.
-
-```mermaid
-flowchart LR
-    U[Browser] --> F[Flask app.py]
-    F --> MShared[model_service.py]
-    MShared --> S[sensor_model joblib]
-    MShared --> L[leaf_disease_model pth]
-    MShared --> T[satellite_weather_model pth]
-    F --> W[weather_feed.py]
-    F --> E[recommendation_engine.py]
-    E --> D[delivery.py -> outputs/]
-    D --> R[Report download]
-```
 
 ---
 

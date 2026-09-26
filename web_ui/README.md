@@ -1,8 +1,7 @@
 # Web UI (Flask)
 
-A workspace dashboard over the Farm Advisory Platform. Every trained subsystem and
-the ESP32 field node are visualised, and the full advisory pipeline runs
-end-to-end from a single page.
+Four pages, one job each. Every trained subsystem and the ESP32 field node are
+visible from the same dashboard.
 
 ## Run
 
@@ -23,26 +22,26 @@ python app.py --cli    # instead runs the live CLI advisory pipeline
 Then open <http://127.0.0.1:5001>. The server binds to `0.0.0.0` so field nodes
 on the same network can reach it.
 
-## Interface
-
-A fixed sidebar groups the workspace, a sticky top bar shows breadcrumbs and the
-node's live state, and every page is built from the same primitives: metric
-cards, panel cards, flow lanes, data tables and suggestion lists.
-
-The sensor and advisory pages use **range sliders** with live value readouts
-rather than number boxes, so a scenario can be dialled in by dragging.
-
 ## Pages
 
-| Route        | What it does                                                                        |
-|--------------|-------------------------------------------------------------------------------------|
-| `/`          | Overview: live telemetry, metric cards, donut, signal flow, history, summary         |
-| `/device`    | Field node: IP connection, reachability probe, known nodes, firmware payload contract |
-| `/sensor`    | Sensor model: slider simulator, disease donut, yield gauge, radar, range bars        |
-| `/leaf`      | Leaf vision: upload a photo for EfficientNet-B0 diagnosis + confidence donut          |
-| `/satellite` | Sky vision: classify cloud / rain / shine / sunrise + confidence donut                |
-| `/weather`   | Live conditions, metric cards and a 3-day forecast chart                             |
-| `/advisory`  | Full pipeline: priority mix, disease donut, ranked suggestions, report downloads      |
+| Route       | What it does                                                             |
+|-------------|--------------------------------------------------------------------------|
+| `/`         | Overview: live metrics, the disease pie chart, the reading log, trends, the pipeline and the weather outlook |
+| `/device`   | Field node: connect an ESP32 by IP address and see its latest reading      |
+| `/vision`   | Two image classifiers: leaf disease and weather state                     |
+| `/advisory` | Run the full pipeline and get ranked actions plus a downloadable report    |
+
+## Overview page
+
+The dashboard answers four questions and nothing else:
+
+1. **What state is the field in?** — crop state, yield forecast, top disease risk
+2. **Why?** — the disease pie chart from the Random Forest classifier
+3. **How is it changing?** — the last 10 readings as a table, plus trend sparklines
+4. **What does the weather do?** — a three-day outlook with a location field
+
+The pipeline lanes show how a reading becomes advice, so the flow is visible
+without a separate page.
 
 ## Field-node API
 
@@ -72,16 +71,15 @@ library, so the dashboard ships no chart assets and has no chart CDN dependency.
 `viz.py` contains pure geometry helpers (coordinates, percentages, CSS gradient
 strings) registered as Jinja globals. `_charts.html` turns them into macros:
 
-| Macro         | Technique                                       | Visual                                        |
-|---------------|-------------------------------------------------|-----------------------------------------------|
-| `donut`       | CSS `conic-gradient` with a masked centre        | disease / confidence / priority mix            |
-| `gauge`       | inline SVG arc (`stroke-dasharray`) + needle    | Yield_Rate forecast                            |
-| `radar`       | inline SVG polygons, rings and axes             | sensor profile against ideal range             |
-| `rangebars`   | HTML/CSS bars over a track                      | reading position inside each admissible range  |
-| `sparkgrid`   | inline SVG polylines                           | small-multiple telemetry time series           |
-| `forecast`    | HTML/CSS positioned columns                     | 3-day temperature range and precipitation      |
-| `flow`        | HTML/CSS nodes with arrow connectors            | signal-flow lanes                              |
-| `suggestions` | HTML cards                                      | ranked advisory actions                        |
+| Macro         | Technique                                    | Visual                                     |
+|---------------|-----------------------------------------------|--------------------------------------------|
+| `donut`       | CSS `conic-gradient` with a masked centre     | disease / confidence / priority mix         |
+| `radar`       | inline SVG polygons, rings and axes          | sensor profile against ideal range          |
+| `rangebars`   | HTML/CSS bars over a track                   | reading position inside each range          |
+| `sparkgrid`   | inline SVG polylines                         | telemetry trends                            |
+| `forecast`    | HTML/CSS positioned columns                  | 3-day temperature range and rain            |
+| `flow`        | HTML/CSS nodes with arrow connectors         | signal-flow lanes                           |
+| `suggestions` | HTML cards                                   | ranked advisory actions                     |
 
 Typography and icons come from Manrope and Font Awesome via CDN; the layout
 degrades cleanly if they fail to load.
@@ -93,7 +91,7 @@ web_ui/
 ├── app.py            Flask routes + field-node API
 ├── viz.py            chart geometry helpers (no image output)
 ├── model_service.py  lazy-loaded, cached inference helpers
-├── templates/        Jinja2 templates (pages + _charts)
+├── templates/        base, index, device, vision, advisory + _charts
 ├── static/style.css  workspace design system
 ├── requirements.txt
 └── uploads/          runtime folder for image uploads (auto-cleaned)

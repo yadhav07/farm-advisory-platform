@@ -28,8 +28,8 @@
       <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'index' }}" href="{{ url_for('index') }}">
         <span class="nav-icon nav-icon-total"><i class="fa-solid fa-chart-pie"></i></span>
         <span class="nav-copy">
-          <strong>Total overview</strong>
-          <small>Live telemetry &amp; models</small>
+          <strong>Overview</strong>
+          <small>Live field state</small>
         </span>
         <i class="fa-solid fa-chevron-right nav-arrow"></i>
       </a>
@@ -41,47 +41,19 @@
         </span>
         <i class="fa-solid fa-chevron-right nav-arrow"></i>
       </a>
+      <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'vision' }}" href="{{ url_for('vision') }}">
+        <span class="nav-icon nav-icon-cement"><i class="fa-solid fa-image"></i></span>
+        <span class="nav-copy">
+          <strong>Vision</strong>
+          <small>Leaf and sky photos</small>
+        </span>
+        <i class="fa-solid fa-chevron-right nav-arrow"></i>
+      </a>
       <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'advisory' }}" href="{{ url_for('advisory') }}">
-        <span class="nav-icon nav-icon-cement"><i class="fa-solid fa-lightbulb"></i></span>
+        <span class="nav-icon nav-icon-violet"><i class="fa-solid fa-lightbulb"></i></span>
         <span class="nav-copy">
           <strong>Advisory</strong>
           <small>Ranked actions</small>
-        </span>
-        <i class="fa-solid fa-chevron-right nav-arrow"></i>
-      </a>
-    </nav>
-
-    <div class="nav-label">Models</div>
-    <nav class="sidebar-nav">
-      <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'sensor' }}" href="{{ url_for('sensor') }}">
-        <span class="nav-icon nav-icon-total"><i class="fa-solid fa-tower-broadcast"></i></span>
-        <span class="nav-copy">
-          <strong>Sensor model</strong>
-          <small>Disease &amp; yield</small>
-        </span>
-        <i class="fa-solid fa-chevron-right nav-arrow"></i>
-      </a>
-      <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'leaf' }}" href="{{ url_for('leaf') }}">
-        <span class="nav-icon nav-icon-cement"><i class="fa-solid fa-leaf"></i></span>
-        <span class="nav-copy">
-          <strong>Leaf vision</strong>
-          <small>EfficientNet-B0</small>
-        </span>
-        <i class="fa-solid fa-chevron-right nav-arrow"></i>
-      </a>
-      <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'satellite' }}" href="{{ url_for('satellite') }}">
-        <span class="nav-icon nav-icon-power"><i class="fa-solid fa-cloud-sun"></i></span>
-        <span class="nav-copy">
-          <strong>Sky vision</strong>
-          <small>Weather-state CNN</small>
-        </span>
-        <i class="fa-solid fa-chevron-right nav-arrow"></i>
-      </a>
-      <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'weather' }}" href="{{ url_for('weather') }}">
-        <span class="nav-icon nav-icon-violet"><i class="fa-solid fa-wind"></i></span>
-        <span class="nav-copy">
-          <strong>Live weather</strong>
-          <small>Open-Meteo feed</small>
         </span>
         <i class="fa-solid fa-chevron-right nav-arrow"></i>
       </a>

@@ -1,16 +1,18 @@
 """Flask web dashboard for the Farm Advisory Platform.
 
-Serves live field-node telemetry (ESP32) and the trained models:
+Four pages, one purpose each:
 
-* ``POST /api/sensor-data``  ingest the JSON posted by the ESP32 firmware
-* ``GET  /api/devices``      list known field nodes
-* ``GET  /api/latest``       latest reading, mapped to the model schema
-* ``/``                      overview dashboard for the live node
-* ``/device``                field-node connection panel (IP address input)
-* ``/sensor``                disease diagnosis + yield forecast
-* ``/leaf`` ``/satellite``   image classification
-* ``/weather``               live conditions + forecast
-* ``/advisory``              full pipeline with report downloads
+* ``/``          overview - live reading, the disease pie chart, weather, the
+                 pipeline map and the reading log
+* ``/device``    field node - connect an ESP32 by IP address
+* ``/vision``    leaf and sky image classification
+* ``/advisory``  run the full pipeline and get ranked actions + a report
+
+Plus the field-node API consumed by the ESP32 firmware:
+
+* ``POST /api/sensor-data``  ingest a firmware reading
+* ``GET  /api/devices``      list known nodes
+* ``GET  /api/latest``       latest reading mapped to the model schema
 
 Every visual is rendered by the browser as HTML, CSS or inline SVG. Python only
 supplies coordinates and percentages through the ``viz`` helpers, so there is no
@@ -64,8 +66,8 @@ def save_upload(file_storage):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     original = secure_filename(file_storage.filename or 'image.jpg')
     ext = original.rsplit('.', 1)[1].lower() if '.' in original else 'jpg'
-    name = f'{dt.datetime.now():%Y%m%d_%H%M%S}_{_name_suffix()}.{ext}'
-    path = os.path.join(UPLOAD_DIR, name)
+    path = os.path.join(UPLOAD_DIR,
+                        f'{dt.datetime.now():%Y%m%d_%H%M%S}_{_name_suffix()}.{ext}')
     file_storage.save(path)
     return path
 
@@ -147,22 +149,17 @@ def priority_summary(recommendations):
         'pairs': [(name, counts[name]) for name in active],
         'colors': [viz.PRIORITY_COLORS[name] for name in active],
         'total': sum(counts.values()),
-        'high': counts['High'],
     }
 
 
 def resolve_live_reading(device_id=None):
-    """Latest field-node reading if one exists, otherwise the simulated node.
-
-    Returns a dict with ``values``, ``source`` and display metadata.
-    """
+    """Latest field-node reading if one exists, otherwise the simulated node."""
     registry = model_service.get_device_registry()
     record = registry.get(device_id)
 
     if record:
-        values = {k: float(v) for k, v in record['sensor'].items()}
         return {
-            'sensor': values,
+            'sensor': {k: float(v) for k, v in record['sensor'].items()},
             'source': 'device',
             'device_id': record.get('device_id', 'ESP32'),
             'source_ip': record.get('source_ip', ''),
@@ -173,9 +170,8 @@ def resolve_live_reading(device_id=None):
         }
 
     reading = model_service.live_reading()
-    values = {f: float(reading[f]) for f in model_service.SENSOR_FEATURES}
     return {
-        'sensor': values,
+        'sensor': {f: float(reading[f]) for f in model_service.SENSOR_FEATURES},
         'source': 'simulated',
         'device_id': reading.get('node_id', 'SIM'),
         'source_ip': '',
@@ -188,7 +184,7 @@ def resolve_live_reading(device_id=None):
 
 def resolve_history(live, limit=40):
     """Telemetry history for the live reading: device log or simulated log."""
-    if live['source'] == 'device':
+    if live and live['source'] == 'device':
         return model_service.get_device_registry().history(live['device_id'], limit)
     return model_service.read_telemetry(limit)
 
@@ -255,9 +251,9 @@ def api_latest():
 
 
 # ---------------------------------------------------------------------------
-# Overview dashboard
+# Overview
 # ---------------------------------------------------------------------------
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def index():
     error = None
     result = None
@@ -266,6 +262,8 @@ def index():
     rows = []
     risk = (None, 0.0)
     values = sensor_values_for_defaults()
+    defaults = model_service.get_farm_defaults()
+    latitude, longitude = defaults['latitude'], defaults['longitude']
 
     try:
         live = resolve_live_reading()
@@ -273,23 +271,29 @@ def index():
         result = model_service.sensor_predict(values)
         risk = top_risk(result['probabilities'])
 
-        defaults = model_service.get_farm_defaults()
+        # Optional location override for the weather card.
+        if request.method == 'POST':
+            latitude = float(request.form.get('latitude', latitude))
+            longitude = float(request.form.get('longitude', longitude))
+            if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
+                raise ValueError('coordinates out of range')
         weather = model_service.build_weather_feed(
-            defaults['latitude'], defaults['longitude']).fetch_current()
+            latitude, longitude).fetch_current()
         rows = build_forecast_rows(weather)
+    except ValueError as exc:
+        error = format_error(str(exc))
     except Exception as exc:
         error = format_error(str(exc))
 
     return render_template(
         'index.html', result=result, live=live, weather=weather,
-        forecast_rows=rows, telemetry=resolve_history(live or {'source': 'simulated',
-                                                               'device_id': None}),
-        fields=SENSOR_FIELD_GUIDE, values=values, risk=risk, error=error,
+        forecast_rows=rows, telemetry=resolve_history(live), risk=risk,
+        error=error, latitude=latitude, longitude=longitude,
     )
 
 
 # ---------------------------------------------------------------------------
-# Field-node connection panel
+# Field node
 # ---------------------------------------------------------------------------
 @app.route('/device', methods=['GET', 'POST'])
 def device():
@@ -306,141 +310,46 @@ def device():
             error = 'Enter the IP address of the field node.'
         else:
             probe = registry.probe(ip)
-            if not probe.get('ok') and probe.get('payload'):
-                error = None
             selected = (request.form.get('device_id') or selected).strip()
 
     live = resolve_live_reading(selected or None)
-    result = None
-    if live['source'] == 'device' or request.values.get('demo'):
-        try:
-            result = model_service.sensor_predict(live['sensor'])
-        except Exception as exc:
-            error = format_error(str(exc))
-
     return render_template('device.html', devices=devices, probe=probe, error=error,
-                           live=live, result=result, selected=selected,
-                           fields=SENSOR_FIELD_GUIDE, values=live['sensor'])
+                           live=live, selected=selected)
 
 
 # ---------------------------------------------------------------------------
-# Sensor analytics
+# Vision: leaf disease and weather-state classification
 # ---------------------------------------------------------------------------
-@app.route('/sensor', methods=['GET', 'POST'])
-def sensor():
-    error = None
-    result = None
-    risk = (None, 0.0)
-    is_live = request.method == 'GET'
-
-    if is_live:
-        try:
-            live = resolve_live_reading(request.args.get('device_id'))
-            values = live['sensor']
-        except Exception as exc:
-            error = format_error(str(exc))
-            values = sensor_values_for_defaults()
-    else:
-        values, error = parse_sensor_form(request.form)
-
-    if error is None:
-        try:
-            result = model_service.sensor_predict(values)
-            risk = top_risk(result['probabilities'])
-        except Exception as exc:
-            error = format_error(str(exc))
-
-    return render_template('sensor.html', fields=SENSOR_FIELD_GUIDE, values=values,
-                           result=result, error=error, is_live=is_live, risk=risk)
-
-
-# ---------------------------------------------------------------------------
-# Leaf disease detection
-# ---------------------------------------------------------------------------
-@app.route('/leaf', methods=['GET', 'POST'])
-def leaf():
-    result = None
+@app.route('/vision', methods=['GET', 'POST'])
+def vision():
+    leaf_result = None
+    sky_result = None
     error = None
 
     if request.method == 'POST':
+        model = request.form.get('model')
         upload = request.files.get('image')
         if upload is None or upload.filename == '':
-            error = format_error('Please choose a leaf image to upload.')
+            error = format_error('Choose an image first.')
         elif not allowed_file(upload.filename):
             error = format_error('Unsupported image type. Use PNG, JPG, JPEG, WebP or BMP.')
         else:
             path = save_upload(upload)
             try:
-                result = model_service.leaf_diagnose(path)
+                if model == 'sky':
+                    sky_result = model_service.satellite_diagnose(path)
+                else:
+                    leaf_result = model_service.leaf_diagnose(path)
             except Exception as exc:
                 error = format_error(str(exc))
             finally:
                 shutil.rmtree(UPLOAD_DIR, ignore_errors=True)  # keep the tree tidy
 
-    return render_template('leaf.html', result=result, error=error)
+    return render_template('vision.html', leaf=leaf_result, sky=sky_result, error=error)
 
 
 # ---------------------------------------------------------------------------
-# Satellite / weather-state classification
-# ---------------------------------------------------------------------------
-@app.route('/satellite', methods=['GET', 'POST'])
-def satellite():
-    result = None
-    error = None
-
-    if request.method == 'POST':
-        upload = request.files.get('image')
-        if upload is None or upload.filename == '':
-            error = format_error('Please choose a sky or field image to upload.')
-        elif not allowed_file(upload.filename):
-            error = format_error('Unsupported image type. Use PNG, JPG, JPEG, WebP or BMP.')
-        else:
-            path = save_upload(upload)
-            try:
-                result = model_service.satellite_diagnose(path)
-            except Exception as exc:
-                error = format_error(str(exc))
-            finally:
-                shutil.rmtree(UPLOAD_DIR, ignore_errors=True)
-
-    return render_template('satellite.html', result=result, error=error)
-
-
-# ---------------------------------------------------------------------------
-# Live weather feed
-# ---------------------------------------------------------------------------
-@app.route('/weather', methods=['GET', 'POST'])
-def weather():
-    defaults = model_service.get_farm_defaults()
-    latitude = defaults['latitude']
-    longitude = defaults['longitude']
-    snapshot = None
-    rows = []
-    error = None
-
-    try:
-        if request.method == 'POST':
-            latitude = float(request.form.get('latitude', defaults['latitude']))
-            longitude = float(request.form.get('longitude', defaults['longitude']))
-            if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
-                raise ValueError('coordinates out of range')
-            snapshot = model_service.build_weather_feed(
-                latitude, longitude).fetch_current(force=True)
-        else:
-            snapshot = model_service.build_weather_feed(
-                latitude, longitude).fetch_current()
-        rows = build_forecast_rows(snapshot)
-    except ValueError:
-        error = format_error('Please enter valid decimal latitude and longitude.')
-    except Exception as exc:
-        error = format_error(str(exc))
-
-    return render_template('weather.html', snapshot=snapshot, forecast_rows=rows,
-                           error=error, latitude=latitude, longitude=longitude)
-
-
-# ---------------------------------------------------------------------------
-# Full advisory pipeline
+# Advisory pipeline
 # ---------------------------------------------------------------------------
 @app.route('/advisory', methods=['GET', 'POST'])
 def advisory():
@@ -455,7 +364,7 @@ def advisory():
 
     if is_live:
         try:
-            values = resolve_live_reading(request.args.get('device_id'))['values']
+            values = resolve_live_reading(request.args.get('device_id'))['sensor']
         except Exception as exc:
             error = format_error(str(exc))
     else:
@@ -496,7 +405,6 @@ def advisory():
                     sensor_row, weather=weather,
                     leaf_image=leaf_path, sky_image=sky_path,
                 )
-
                 saved = model_service.get_report_delivery().deliver_file(analysis)
                 report_links = {
                     'markdown': os.path.basename(saved['markdown']),
