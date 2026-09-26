@@ -93,8 +93,30 @@ def _pipeline_requested(args):
     return False
 
 
-def launch_web_ui(port=5001, open_browser=True):
-    """Start the Flask web UI (``web_ui/app.py``) as the default mode."""
+def lan_ip():
+    """Best-effort LAN address of this machine, for the ESP32 SERVER_URL."""
+    import socket
+    try:
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        probe.settimeout(0.3)
+        # No packet is sent; this just asks the OS which local interface
+        # would be used to reach the outside world.
+        probe.connect(('8.8.8.8', 80))
+        address = probe.getsockname()[0]
+        probe.close()
+        return address
+    except OSError:
+        return socket.gethostbyname(socket.gethostname())
+
+
+def launch_web_ui(port=5001, open_browser=True, host=None):
+    """Start the Flask web UI (``web_ui/app.py``) as the default mode.
+
+    ``host`` defaults to the ``HOST`` environment variable and then to
+    ``0.0.0.0`` so an ESP32 on the same network can reach the ingest API.
+    ``PORT`` is honoured too, so the same entry point works unchanged behind a
+    PaaS that assigns the port.
+    """
     import importlib.util
     import threading
     import webbrowser
@@ -108,6 +130,12 @@ def launch_web_ui(port=5001, open_browser=True):
     if web_dir not in sys.path:
         sys.path.insert(0, web_dir)
 
+    try:
+        port = int(os.environ.get('PORT', port))
+    except (TypeError, ValueError):
+        pass
+    host = host or os.environ.get('HOST', '0.0.0.0')
+
     # Import web_ui/app.py under a distinct name so its `__main__` block
     # never runs - we start the server ourselves below.
     spec = importlib.util.spec_from_file_location('farm_advisory_webapp', web_app_path)
@@ -115,17 +143,23 @@ def launch_web_ui(port=5001, open_browser=True):
     sys.modules['farm_advisory_webapp'] = web_module
     spec.loader.exec_module(web_module)
 
-    url = f'http://127.0.0.1:{port}'
+    local_url = f'http://127.0.0.1:{port}'
+    lan_url = f'http://{lan_ip()}:{port}' if host == '0.0.0.0' else local_url
+
     print('=' * 72)
     print(' FARM ADVISORY WEB UI '.center(72, '='))
     print('=' * 72)
-    print(f'[app] serving on {url}')
+    print(f'[app] local    {local_url}')
+    if lan_url != local_url:
+        print(f'[app] network  {lan_url}   <- point the ESP32 SERVER_URL here')
+    print('[app] health   ' + f'{lan_url}/healthz')
+    print('[app] ingest   ' + f'{lan_url}/api/sensor-data')
     print('[app] press CTRL+C to stop the server')
 
     if open_browser:
-        threading.Timer(1.2, webbrowser.open, args=(url,)).start()
+        threading.Timer(1.2, webbrowser.open, args=(local_url,)).start()
 
-    web_module.app.run(host='127.0.0.1', port=port, debug=False)
+    web_module.app.run(host=host, port=port, debug=False)
     return None
 
 

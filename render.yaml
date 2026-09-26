@@ -1,0 +1,23 @@
+# One-click deploy to Render: https://render.com/deploy
+#
+# The repo carries its own trained artifacts (~130 MB), so the image build is
+# mostly a dependency install. Models load lazily, which is why one worker with
+# a few threads is the right shape here: a second worker would hold a second
+# copy of every model in memory.
+#
+# Note on sizing: the first request to /vision/leaf or /vision/sky loads
+# EfficientNet-B0 and the weather CNN into RAM. The free tier is likely to be
+# tight for that; a paid instance with at least 2 GB is recommended.
+services:
+  - type: web
+    name: farm-advisory-platform
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 wsgi:application
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.11"
+      - key: THREADS
+        value: "4"

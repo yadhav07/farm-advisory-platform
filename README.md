@@ -40,7 +40,15 @@ python app.py
 ```
 
 The browser opens automatically at <http://127.0.0.1:5001>. The server binds to
-`0.0.0.0` so field nodes on the same network can reach it.
+`0.0.0.0` and prints its LAN address on startup, so field nodes on the same
+network can reach it:
+
+```
+[app] local    http://127.0.0.1:5001
+[app] network  http://10.1.132.248:5001   <- point the ESP32 SERVER_URL here
+[app] health   http://10.1.132.248:5001/healthz
+[app] ingest   http://10.1.132.248:5001/api/sensor-data
+```
 
 Four pages behind a sidebar: **overview** (live metrics, the disease pie chart,
 the reading log and the trend charts), **leaf vision** and **sky vision** (the
@@ -59,9 +67,47 @@ moment one appears.
 
 Both vision pages share one template; `/vision` redirects to `/vision/leaf`.
 
+`GET /healthz` is a liveness probe that loads no model, so it answers while the
+artifacts are still cold.
+
+### 2b. Run it as a production server
+
+`python app.py` uses the Flask development server, which is fine locally but is
+not meant for anything else. For a real deployment use the WSGI entry point:
+
+```bash
+pip install -r requirements.txt
+python wsgi.py                      # waitress on 0.0.0.0:5001
+```
+
+`HOST`, `PORT` and `THREADS` are read from the environment, so the same command
+works unchanged on a host that assigns the port:
+
+```bash
+PORT=8080 THREADS=16 python wsgi.py
+```
+
+Under gunicorn or any PaaS:
+
+```bash
+gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 wsgi:application
+```
+
+**Keep the worker count at 1 and raise threads instead.** The three trained
+artifacts total about 130 MB and a second worker would load a second copy of
+every model into memory. They load lazily, so the process starts cheaply and only
+the page you open pays for its model.
+
+`Procfile` and `render.yaml` are already set up for Heroku/Railway and Render.
+The `render.yaml` build installs CPU-only torch, which is much smaller than the
+default CUDA wheel; the web layer runs every model on CPU anyway. Budget at least
+2 GB of RAM on the host, because the first request to a vision page pulls
+EfficientNet-B0 and the weather CNN into memory.
+
 ### 3. Connect an ESP32 field node
 
-The firmware in `hardware/esp32_farm_node/` posts readings to this server:
+The firmware in `hardware/esp32_farm_node/` posts readings to this server. Use
+the network address the server printed on startup, not `127.0.0.1`:
 
 ```json
 POST http://<your-pc-ip>:5001/api/sensor-data
@@ -163,6 +209,10 @@ Multidisciplinary_Project/
 ├── hardware/
 │   └── esp32_farm_node/       # ESP32 firmware (posts + serves readings)
 └── project_architecture.md    # full technical specification
+wsgi.py                   # production WSGI entry point (gunicorn / waitress / PaaS)
+requirements.txt          # pinned runtime dependencies
+Procfile                  # Heroku / Railway / Render start command
+render.yaml               # one-click Render blueprint
 ```
 
 `project_architecture.md` contains the complete design write-up: feature

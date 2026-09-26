@@ -269,6 +269,24 @@ def api_latest():
     })
 
 
+@app.route('/healthz')
+def healthz():
+    """Liveness probe for the PaaS health check.
+
+    Deliberately does no model loading: it must answer while the 130 MB of
+    artifacts are still cold, so a slow first request cannot be mistaken for a
+    dead process.
+    """
+    devices = model_service.get_device_registry().devices()
+    return jsonify({
+        'ok': True,
+        'status': 'healthy',
+        'pages': ['/', '/vision/leaf', '/vision/sky', '/advisory'],
+        'nodes_reporting': sum(1 for d in devices if d['online']),
+        'nodes_known': len(devices),
+    })
+
+
 # ---------------------------------------------------------------------------
 # Overview
 # ---------------------------------------------------------------------------
@@ -424,4 +442,16 @@ def advisory_report(filename):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    # Bind 0.0.0.0 by default so an ESP32 on the LAN can reach this server.
+    # HOST/PORT let a PaaS or a container override both without a code change.
+    def _env_int(name, default):
+        try:
+            return int(os.environ.get(name, default))
+        except (TypeError, ValueError):
+            return default
+
+    app.run(
+        host=os.environ.get('HOST', '0.0.0.0'),
+        port=_env_int('PORT', 5001),
+        debug=False,
+    )

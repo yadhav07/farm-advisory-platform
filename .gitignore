@@ -13,6 +13,15 @@ web_ui/uploads/
 farm_advisory/dataset/weather_cache.json
 *.log
 
+# Field-node runtime state: written by the ESP32 ingest API on every reading.
+# Local telemetry, not source.
+farm_advisory/dataset/device_readings.csv
+farm_advisory/dataset/devices.json
+
+# Generated advisory reports (recreate them by running the pipeline)
+farm_advisory/outputs/advisory_*.md
+farm_advisory/outputs/advisory_*.json
+
 # OS / editor
 .DS_Store
 Thumbs.db

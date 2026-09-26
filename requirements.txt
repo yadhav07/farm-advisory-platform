@@ -1,0 +1,31 @@
+# Runtime dependencies for the FarmIQ advisory workspace.
+#
+# The web layer runs every model on CPU (see web_ui/model_service.py DEVICE),
+# so the CUDA build of torch is not needed here and is roughly 2 GB smaller.
+# For a CPU-only install uncomment the extra-index line at the bottom.
+#
+#   pip install -r requirements.txt
+#
+# Trained artifacts are committed to this repository (~130 MB):
+#   sensor_model/rf_model.joblib
+#   leaf_disease_model/best_leaf_disease_model.pth
+#   satellite_weather_model/satellite_weather_model.pth
+# They are loaded lazily, so only the page you open pays for its model.
+
+flask==3.1.3
+waitress==3.0.2
+
+# Inference
+torch==2.13.0
+torchvision==0.28.0
+scikit-learn==1.8.0
+joblib==1.5.3
+pandas==3.0.1
+numpy==2.5.1
+pillow==12.3.0
+
+# Live weather feed used by the advisory run
+requests==2.32.5
+
+# CPU-only torch (much smaller than the default CUDA wheel):
+# pip install torch==2.13.0 torchvision==0.28.0 --index-url https://download.pytorch.org/whl/cpu
