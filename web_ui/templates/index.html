@@ -2,7 +2,6 @@
 {% from "_charts.html" import donut, sparkgrid %}
 
 {% block title %}Overview · FarmIQ{% endblock %}
-{% block crumb %}Overview{% endblock %}
 
 {% block content %}
 <section class="view">
@@ -12,19 +11,19 @@
       <p class="eyebrow">OVERVIEW</p>
       <h1>The field right now.</h1>
       <p>
-        {% if live and live.source == 'device' %}
+        {% if live %}
           Live reading from <strong>{{ live.device_id }}</strong>{% if live.source_ip %} ({{ live.source_ip }}){% endif %},
           classified by the disease model and scored by the yield regressor.
         {% else %}
-          A simulated node is driving the dashboard. Connect a real ESP32 on the
-          <strong>Field node</strong> page.
+          Nothing is reporting yet. The dashboard shows real hardware only, so
+          point a node at the ingest endpoint and this page fills in.
         {% endif %}
       </p>
     </div>
     <div class="heading-note">
       <i class="fa-regular fa-clock"></i>
       <span>
-        <strong>{{ live.timestamp[11:19] }} UTC</strong>
+        <strong>{{ live.timestamp[11:19] ~ ' UTC' if live else 'Waiting' }}</strong>
         {{ telemetry|length }} readings logged
       </span>
     </div>
@@ -37,7 +36,7 @@
         <span>Crop state</span>
         <span class="metric-icon metric-icon-total"><i class="fa-solid fa-wheat-awn"></i></span>
       </div>
-      <strong class="metric-value" style="font-size:clamp(20px,1.9vw,26px);">{{ result.prediction }}</strong>
+      <strong class="metric-value metric-value-text">{{ result.prediction }}</strong>
       <p>{{ pct(result.probabilities[result.prediction]) }} confidence</p>
     </article>
 
@@ -69,8 +68,8 @@
     </article>
   </div>
 
-  <div class="grid-2" style="margin-top:16px;">
-    <article class="panel-card donut-card">
+  <div class="grid-2">
+    <article class="panel-card">
       <div class="panel-header">
         <div><span class="panel-kicker">MODEL OUTPUT</span><h2>Disease split</h2></div>
         <span class="panel-period">Random Forest</span>
@@ -85,7 +84,7 @@
         <div><span class="panel-kicker">READING LOG</span><h2>Last 10 readings</h2></div>
         <span class="panel-period">{{ live.device_id }}</span>
       </div>
-      <div class="table-wrap">
+      <div class="table-wrap scroll-y">
         <table class="data-table">
           <thead>
             <tr><th>Time</th><th class="table-num">Moisture</th><th class="table-num">Temp</th>
@@ -110,12 +109,39 @@
     </article>
   </div>
 
-  <article class="panel-card" style="margin-top:16px;">
+  <article class="panel-card">
     <div class="panel-header">
       <div><span class="panel-kicker">TRENDS</span><h2>How conditions move</h2></div>
       <i class="fa-solid fa-chart-line panel-header-icon"></i>
     </div>
     <div class="panel-body">{{ sparkgrid(telemetry) }}</div>
+  </article>
+  {% else %}
+
+  <article class="panel-card">
+    <div class="panel-header">
+      <div><span class="panel-kicker">NO TELEMETRY</span><h2>Waiting for a field node</h2></div>
+      <span class="panel-period">ESP32</span>
+    </div>
+    <div class="panel-body">
+      <p class="panel-hint">
+        No data is invented, so this page stays empty until real hardware
+        reports. Set <code>SERVER_URL</code> in the firmware to the endpoint
+        below; the node posts every few seconds and the overview fills in
+        immediately. The <a href="{{ url_for('advisory') }}">advisory page</a>
+        works without a node.
+      </p>
+      <pre class="payload-pre">POST {{ ingest_url }}
+Content-Type: application/json
+
+{
+  "device_id": "FARM_01",
+  "soil_moisture": 44,
+  "air_temperature": 27.3,
+  "humidity": 64.8,
+  "light_intensity": 585.2
+}</pre>
+    </div>
   </article>
   {% endif %}
 

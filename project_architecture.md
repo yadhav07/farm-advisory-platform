@@ -114,10 +114,10 @@ Multidisciplinary_Project/
 | **`farm_advisory`** | `test.py` | Python Script | Self-test of the advisory chain (healthy + stressed readings, live/cached weather, leaf image, file delivery). |
 | **`web_ui`** | `app.py` | Python Script | Flask application. Serves the dashboard pages, registers the `viz` helpers as Jinja globals, and serves downloadable advisory reports from `farm_advisory/outputs/`. |
 | **`web_ui`** | `viz.py` | Python Script | Geometry-only chart helpers. Builds CSS `conic-gradient` donuts, gauge arcs and needle positions, radar polygons, sparkline polyline points and forecast bar geometry. No image or file is produced - the browser draws everything. |
-| **`web_ui`** | `model_service.py` | Python Script | Shared inference layer. Lazy-loads and caches every trained artifact (sensor bundle, EfficientNet-B0, weather CNN), reads the logged telemetry history, produces live simulated-node readings, and resolves farm defaults and report delivery. All deep models run on CPU. |
+| **`web_ui`** | `model_service.py` | Python Script | Shared inference layer. Lazy-loads and caches every trained artifact (sensor bundle, EfficientNet-B0, weather CNN), exposes the ESP32 device registry, and resolves farm defaults and report delivery. All deep models run on CPU. |
 | **`web_ui`** | `templates/_charts.html` | Jinja2 Macros | Chart component library: `donut`, `radar`, `rangebars`, `sparkgrid`, `forecast`, `flow` and `suggestions`, composed from HTML, CSS and inline SVG. |
-| **`web_ui`** | `templates/*.html` | Jinja2 Templates | `base.html` (workspace shell: sidebar, top bar, footer) plus four page templates: overview, field node, vision and advisory. |
-| **`web_ui`** | `static/style.css` | CSS | Workspace design system — design tokens, sidebar and top bar, metric cards, panel cards, flow lanes, donut, radar, range bars, sparklines, forecast columns, tables, suggestion cards and sliders. |
+| **`web_ui`** | `templates/*.html` | Jinja2 Templates | `base.html` (workspace shell: sticky top bar with brand, nav tabs, node status and footer) plus three page templates: overview, vision and advisory. |
+| **`web_ui`** | `static/style.css` | CSS | Workspace design system — design tokens, top bar and nav tabs, metric cards, panel cards, donut, radar, range bars, sparklines, tables, suggestion cards and sliders. The alignment contract is documented in the file header. |
 | **`web_ui`** | `uploads/` | Runtime Data | Temporary storage for uploaded leaf/sky images; files and the folder are removed after inference to keep the tree tidy. |
 | **`web_ui`** | `README.md` | Documentation | How to install requirements, start the server, what each page shows and the chart component list. |
 
@@ -305,7 +305,7 @@ flowchart LR
 
 Key design points:
 - **Unified entry point** (`app.py`) - `python app.py` launches the Flask web UI (see section 6) and opens the browser; `python app.py --cli` — or passing any pipeline option such as `--steps`, `--leaf`, `--offline` — runs the live CLI advisory loop instead.
-- **Live IoT ingestion** (`iot_ingestion.py`) validates and persists an 8-feature telemetry row per reading (`dataset/sensor_log.csv`) and includes a realistic `SimulatedSensorNode` (diurnal cycle, drift, stress profiles) so the full loop runs without hardware.
+- **Live IoT ingestion** (`iot_ingestion.py`) validates and persists an 8-feature telemetry row per reading (`dataset/sensor_log.csv`) and includes a realistic `SimulatedSensorNode` (diurnal cycle, drift, stress profiles). The web dashboard does not use the simulated node; it stays available to the CLI pipeline and the tests.
 - **Live weather feed** (`weather_feed.py`) uses the free Open-Meteo API and a 30-minute on-disk cache, with a graceful fallback to cached/offline values so advisories never fail on network drops.
 - **Recommendation engine** (`recommendation_engine.py`) fuses model predictions (disease probability, yield forecast, leaf diagnosis, sky condition) with agronomic thresholds (soil moisture, pH, NPK, humidity, temperature, forecast rain/heat/wind) into **prioritized actions** (High / Medium / Low) with a plain-language rationale.
 - **Automated delivery** (`delivery.py`) writes timestamped markdown + JSON reports to `outputs/`, prints a console summary, and can push the same advisories via SMTP email or a Telegram bot when credentials are configured in `config.py`.
@@ -314,17 +314,16 @@ Key design points:
 
 ## 6. Web Dashboard (`./web_ui/`)
 
-A deliberately small Flask dashboard: four pages, one job each. Models are loaded once and cached (running on CPU), and **every visual is rendered by the browser as HTML, CSS or inline SVG** - no server-side image generation, no matplotlib and no JavaScript charting library. Python only supplies coordinates, percentages and gradient strings through the `viz` helpers:
+A deliberately small Flask dashboard: three pages, one job each, under one sticky top bar. Models are loaded once and cached (running on CPU), and **every visual is rendered by the browser as HTML, CSS or inline SVG** - no server-side image generation, no matplotlib and no JavaScript charting library. Python only supplies coordinates, percentages and gradient strings through the `viz` helpers:
 
 | Route | Page | Function |
 | :--- | :--- | :--- |
 | `/` | Overview | Live metrics (crop state, yield, top risk), the disease pie chart, the reading log and the trend sparklines. |
-| `/device` | Field node | IP-address connection panel, reachability probe, latest reading, known-node table and the firmware payload contract. |
 | `/vision` | Vision | Two image classifiers side by side: leaf disease (EfficientNet-B0) and weather state (weather CNN), each with a confidence donut and top-3 bars. |
 | `/advisory` | Advisory | Slider-driven full pipeline -> ranked actions, the disease pie for the scenario, the feature profile and downloadable markdown/JSON reports. |
 | `POST /api/sensor-data` | Field-node API | Ingests the ESP32 JSON payload, maps it to the 8-feature schema, stores it and returns the crop-state and yield assessment. |
 | `GET /api/devices` | Field-node API | Known nodes with IP address, last reading, measured-feature count and online state. |
-| `GET /api/latest` | Field-node API | Latest reading (device or simulated) with mapped features, context signals and measured/estimated provenance. |
+| `GET /api/latest` | Field-node API | Latest reading with mapped features, context signals and measured/estimated provenance; `source: none` until a node reports. |
 
 Consolidation kept the surface small: the sensor simulator, the live-weather page
 and the two vision pages of the first iteration are merged into `/advisory`,
@@ -336,7 +335,7 @@ and the two vision pages of the first iteration are merged into `/advisory`,
 flowchart LR
     S[ESP32 sensors] --> F[firmware]
     F -->|POST /api/sensor-data every 10s| API[Flask field-node API]
-    F -->|GET /api/sensor-data on request| U[IP input in /device]
+    F -.->|DeviceRegistry.probe(ip), backend only| U[Not exposed in the UI]
     U --> API
     API --> M[device_ingest.map_to_sensor_schema]
     M --> R[(device_readings.csv + devices.json)]
@@ -359,7 +358,8 @@ Sensor mapping and provenance rules are documented in
 | `suggestions` | HTML cards | ranked advisory actions with priority badges |
 
 ### 6.2 Design Points
-- **Workspace shell** - a fixed sidebar (brand, navigation, node status card), a sticky top bar with breadcrumbs and live-node state, and a content column built from metric cards, panel cards, data tables and suggestion lists.
+- **Workspace shell** - no sidebar. A sticky top bar carries the brand, three nav tabs and the node status pill, and a content column is built from metric cards, panel cards, data tables and suggestion lists.
+- **Alignment contract** - the top bar and the content column share one width and one horizontal padding, `.view` applies one uniform vertical gap, cards in a grid row stretch to the tallest, every panel header has one height, and metric captions are pinned to the bottom so they share a baseline. Spacing inside a card uses the `gap-sm` / `gap-md` / `gap-lg` utilities, never an inline margin.
 - **Aligned rows** - every two-column row uses equal `minmax(0, 1fr)` columns; cards stretch to the tallest card in the row and the panel body fills the leftover height, so card headers, charts and tables line up. Metric cards pin their sub-text to the bottom with `margin-top: auto`.
 - **Slider-based simulator** - the advisory inputs use `input[type=range]` with live readouts and a JS-painted progress track, replacing plain number boxes.
 - **Single inference layer** (`model_service.py`) - every model artifact (sensor `rf_model.joblib`, leaf checkpoint, satellite checkpoint) is loaded lazily into a module-level singleton and reused across requests.

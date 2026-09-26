@@ -12,122 +12,52 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<div class="app-shell">
 
-  <aside class="sidebar" aria-label="Primary navigation">
-    <div class="sidebar-brand">
+{% set nav_pages = [
+  ('index',    'Overview', 'chart-pie'),
+  ('vision',   'Vision',   'image'),
+  ('advisory', 'Advisory', 'lightbulb')
+] %}
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="{{ url_for('index') }}">
       <span class="brand-mark"><i class="fa-solid fa-seedling"></i></span>
-      <div>
-        <strong>FarmIQ</strong>
-        <span>Advisory workspace</span>
-      </div>
-    </div>
+      <strong>FarmIQ</strong>
+    </a>
 
-    <div class="nav-label">Workspace</div>
-    <nav class="sidebar-nav">
-      <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'index' }}" href="{{ url_for('index') }}">
-        <span class="nav-icon nav-icon-total"><i class="fa-solid fa-chart-pie"></i></span>
-        <span class="nav-copy">
-          <strong>Overview</strong>
-          <small>Live field state</small>
-        </span>
-        <i class="fa-solid fa-chevron-right nav-arrow"></i>
+    <nav class="topnav" aria-label="Primary">
+      {% for endpoint, label, glyph in nav_pages %}
+      <a class="topnav-btn {{ 'active' if request.endpoint == endpoint }}"
+         href="{{ url_for(endpoint) }}"
+         {{ 'aria-current="page"' | safe if request.endpoint == endpoint }}>
+        <i class="fa-solid fa-{{ glyph }}"></i>{{ label }}
       </a>
-      <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'device' }}" href="{{ url_for('device') }}">
-        <span class="nav-icon nav-icon-power"><i class="fa-solid fa-microchip"></i></span>
-        <span class="nav-copy">
-          <strong>Field node</strong>
-          <small>ESP32 connection</small>
-        </span>
-        <i class="fa-solid fa-chevron-right nav-arrow"></i>
-      </a>
-      <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'vision' }}" href="{{ url_for('vision') }}">
-        <span class="nav-icon nav-icon-cement"><i class="fa-solid fa-image"></i></span>
-        <span class="nav-copy">
-          <strong>Vision</strong>
-          <small>Leaf and sky photos</small>
-        </span>
-        <i class="fa-solid fa-chevron-right nav-arrow"></i>
-      </a>
-      <a class="sidebar-nav-btn {{ 'active' if request.endpoint == 'advisory' }}" href="{{ url_for('advisory') }}">
-        <span class="nav-icon nav-icon-violet"><i class="fa-solid fa-lightbulb"></i></span>
-        <span class="nav-copy">
-          <strong>Advisory</strong>
-          <small>Ranked actions</small>
-        </span>
-        <i class="fa-solid fa-chevron-right nav-arrow"></i>
-      </a>
+      {% endfor %}
     </nav>
 
-    <div class="sidebar-spacer"></div>
-
-    {% if live %}
-      {% if live.source == 'device' and live.online %}
-        <div class="model-status-card">
-          <span class="status-icon live"><i class="fa-solid fa-circle-check"></i></span>
-          <div>
-            <strong>{{ live.device_id }} online</strong>
-            <span>{{ live.timestamp[11:19] }} UTC &middot; {{ live.source_ip or 'LAN' }}</span>
-          </div>
-        </div>
-      {% elif live.source == 'device' %}
-        <div class="model-status-card">
-          <span class="status-icon idle"><i class="fa-solid fa-clock"></i></span>
-          <div>
-            <strong>{{ live.device_id }} idle</strong>
-            <span>last seen {{ live.timestamp[11:19] }} UTC</span>
-          </div>
-        </div>
+    <div class="topbar-actions">
+      {% if live and live.online %}
+        <span class="live-status"><span></span>{{ live.device_id }} live</span>
+      {% elif live %}
+        <span class="live-status idle"><span></span>{{ live.device_id }} idle</span>
       {% else %}
-        <div class="model-status-card">
-          <span class="status-icon idle"><i class="fa-solid fa-flask"></i></span>
-          <div>
-            <strong>Simulated node</strong>
-            <span>no field node reporting</span>
-          </div>
-        </div>
+        <span class="live-status idle"><span></span>no node reporting</span>
       {% endif %}
-    {% endif %}
-
-    <div class="sidebar-user">
-      <span class="user-avatar">FA</span>
-      <div class="user-meta">
-        <strong>{{ live.device_id if live else 'Farm node' }}</strong>
-        <span>{{ 'Field telemetry' if live and live.source == 'device' else 'Simulation' }}</span>
-      </div>
     </div>
-  </aside>
+  </div>
+</header>
 
-  <main class="main-shell">
-    <header class="topbar">
-      <div class="breadcrumbs">
-        <span>Farm operations</span>
-        <i class="fa-solid fa-chevron-right"></i>
-        <strong>{% block crumb %}Overview{% endblock %}</strong>
-      </div>
-      <div class="topbar-actions">
-        {% if live %}
-          {% if live.source == 'device' %}
-            <span class="live-status"><span></span> {{ live.device_id }} live</span>
-          {% else %}
-            <span class="live-status idle"><span></span> simulated node</span>
-          {% endif %}
-        {% endif %}
-      </div>
-    </header>
+<main class="content-wrap">
+  {% if error %}<div class="alert error"><i class="fa-solid fa-triangle-exclamation"></i><span>{{ error }}</span></div>{% endif %}
 
-    <div class="content-wrap">
-      {% if error %}<div class="alert error"><i class="fa-solid fa-triangle-exclamation"></i><span>{{ error }}</span></div>{% endif %}
-      {% block content %}{% endblock %}
+  {% block content %}{% endblock %}
 
-      <footer class="app-footer">
-        <span>FarmIQ advisory workspace</span>
-        <span>Random Forest &middot; EfficientNet-B0 &middot; Weather CNN &middot; Flask</span>
-      </footer>
-    </div>
-  </main>
-
-</div>
+  <footer class="app-footer">
+    <span>FarmIQ advisory workspace</span>
+    <span>Random Forest &middot; EfficientNet-B0 &middot; Weather CNN &middot; Flask</span>
+  </footer>
+</main>
 
 {% block scripts %}{% endblock %}
 </body>

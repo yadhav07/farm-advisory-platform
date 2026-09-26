@@ -1,10 +1,9 @@
 """Flask web dashboard for the Farm Advisory Platform.
 
-Four pages, one purpose each:
+Three pages, one purpose each:
 
-* ``/``          overview - live reading, the disease pie chart, weather, the
-                 pipeline map and the reading log
-* ``/device``    field node - connect an ESP32 by IP address
+* ``/``          overview - live node metrics, the disease pie chart, the
+                 reading log and the trend charts
 * ``/vision``    leaf and sky image classification
 * ``/advisory``  run the full pipeline and get ranked actions + a report
 
@@ -13,6 +12,9 @@ Plus the field-node API consumed by the ESP32 firmware:
 * ``POST /api/sensor-data``  ingest a firmware reading
 * ``GET  /api/devices``      list known nodes
 * ``GET  /api/latest``       latest reading mapped to the model schema
+
+There is no simulated node. The dashboard reports real hardware only and shows
+an empty state until a node posts a reading.
 
 Every visual is rendered by the browser as HTML, CSS or inline SVG. Python only
 supplies coordinates and percentages through the ``viz`` helpers, so there is no
@@ -33,7 +35,7 @@ if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 from flask import (
-    Flask, render_template, request, abort, send_from_directory, jsonify,
+    Flask, g, render_template, request, abort, send_from_directory, jsonify,
 )
 from werkzeug.utils import secure_filename
 
@@ -130,40 +132,46 @@ def priority_summary(recommendations):
 
 
 def resolve_live_reading(device_id=None):
-    """Latest field-node reading if one exists, otherwise the simulated node."""
-    registry = model_service.get_device_registry()
-    record = registry.get(device_id)
+    """Latest field-node reading, or ``None`` when no node has reported.
 
-    if record:
-        return {
-            'sensor': {k: float(v) for k, v in record['sensor'].items()},
-            'source': 'device',
-            'device_id': record.get('device_id', 'ESP32'),
-            'source_ip': record.get('source_ip', ''),
-            'timestamp': record.get('timestamp', ''),
-            'context': record.get('context', {}),
-            'provenance': record.get('provenance', {}),
-            'online': (dt.datetime.now().timestamp() - record.get('received_at', 0)) <= 90,
-        }
+    Nothing is simulated, so the dashboard stays empty rather than inventing
+    telemetry. Callers use the ``None`` case to show an empty state.
+    """
+    record = model_service.get_device_registry().get(device_id)
+    if not record:
+        return None
 
-    reading = model_service.live_reading()
+    provenance = record.get('provenance') or {}
     return {
-        'sensor': {f: float(reading[f]) for f in model_service.SENSOR_FEATURES},
-        'source': 'simulated',
-        'device_id': reading.get('node_id', 'SIM'),
-        'source_ip': '',
-        'timestamp': reading.get('timestamp', ''),
-        'context': {},
-        'provenance': {f: 'measured' for f in model_service.SENSOR_FEATURES},
-        'online': False,
+        'sensor': {k: float(v) for k, v in record['sensor'].items()},
+        'device_id': record.get('device_id', 'ESP32'),
+        'source_ip': record.get('source_ip', ''),
+        'timestamp': record.get('timestamp', ''),
+        'context': record.get('context', {}),
+        'provenance': provenance,
+        'measured': sum(1 for v in provenance.values() if v == 'measured'),
+        'online': (dt.datetime.now().timestamp() - record.get('received_at', 0)) <= 90,
     }
 
 
 def resolve_history(live, limit=40):
-    """Telemetry history for the live reading: device log or simulated log."""
-    if live and live['source'] == 'device':
-        return model_service.get_device_registry().history(live['device_id'], limit)
-    return model_service.read_telemetry(limit)
+    """Recent readings for the live node; empty when nothing has reported."""
+    if not live:
+        return []
+    return model_service.get_device_registry().history(live['device_id'], limit)
+
+
+def current_reading(device_id=None):
+    """Request-scoped live reading, so the registry is consulted once."""
+    if 'live_reading' not in g:
+        g.live_reading = resolve_live_reading(device_id)
+    return g.live_reading
+
+
+@app.context_processor
+def shell_state():
+    """Node state for the top bar on every page."""
+    return {'live': current_reading()}
 
 
 # Template helpers exposed to Jinja alongside the viz geometry functions.
@@ -211,9 +219,14 @@ def api_devices():
 
 @app.route('/api/latest')
 def api_latest():
-    live = resolve_live_reading(request.args.get('device_id'))
-    if live['source'] != 'device':
-        return jsonify({'ok': True, 'source': 'simulated', 'sensor': live['sensor']})
+    live = current_reading(request.args.get('device_id'))
+    if live is None:
+        return jsonify({
+            'ok': True,
+            'source': 'none',
+            'detail': 'no field node has reported yet',
+            'endpoint': '/api/sensor-data',
+        })
     return jsonify({
         'ok': True,
         'source': 'device',
@@ -235,44 +248,22 @@ def index():
     error = None
     result = None
     live = None
+    telemetry = []
     risk = (None, 0.0)
 
-    try:
-        live = resolve_live_reading()
-        result = model_service.sensor_predict(live['sensor'])
-        risk = top_risk(result['probabilities'])
-    except Exception as exc:
-        error = format_error(str(exc))
+    live = current_reading()
+    if live:
+        telemetry = resolve_history(live)
+        try:
+            result = model_service.sensor_predict(live['sensor'])
+            risk = top_risk(result['probabilities'])
+        except Exception as exc:
+            error = format_error(str(exc))
 
     return render_template(
-        'index.html', result=result, live=live, risk=risk,
-        telemetry=resolve_history(live), error=error,
+        'index.html', result=result, risk=risk, telemetry=telemetry, error=error,
+        ingest_url=request.url_root.rstrip('/') + '/api/sensor-data',
     )
-
-
-# ---------------------------------------------------------------------------
-# Field node
-# ---------------------------------------------------------------------------
-@app.route('/device', methods=['GET', 'POST'])
-def device():
-    registry = model_service.get_device_registry()
-    devices = registry.devices()
-    probe = None
-    error = None
-    selected = (request.values.get('device_id') or
-                (devices[0]['device_id'] if devices else ''))
-
-    if request.method == 'POST':
-        ip = (request.form.get('ip') or '').strip()
-        if not ip:
-            error = 'Enter the IP address of the field node.'
-        else:
-            probe = registry.probe(ip)
-            selected = (request.form.get('device_id') or selected).strip()
-
-    live = resolve_live_reading(selected or None)
-    return render_template('device.html', devices=devices, probe=probe, error=error,
-                           live=live, selected=selected)
 
 
 # ---------------------------------------------------------------------------
@@ -318,16 +309,20 @@ def advisory():
     use_weather = False
     latitude = None
     longitude = None
-    is_live = request.method == 'GET'
 
-    if is_live:
-        try:
-            values = resolve_live_reading(request.args.get('device_id'))['sensor']
-        except Exception as exc:
-            error = format_error(str(exc))
+    if request.method == 'GET':
+        # Start from the live node when one exists, otherwise the guide defaults.
+        live = current_reading(request.args.get('device_id'))
+        if live:
+            values = live['sensor']
+            source = (f"the last reading from {live['device_id']} "
+                      f"at {live['timestamp'][11:19]} UTC")
+        else:
+            source = 'the guide defaults (no field node is reporting)'
     else:
         values, error = parse_sensor_form(request.form)
         use_weather = (request.form.get('use_weather') == 'on')
+        source = 'your values below'
 
     if error is None and request.method == 'POST':
         try:
@@ -378,7 +373,7 @@ def advisory():
 
     return render_template('advisory.html', fields=SENSOR_FIELD_GUIDE, values=values,
                            result=result, error=error, report_links=report_links,
-                           use_weather=use_weather, is_live=is_live,
+                           use_weather=use_weather, source=source,
                            latitude=latitude, longitude=longitude)
 
 

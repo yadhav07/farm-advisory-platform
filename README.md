@@ -42,10 +42,11 @@ python app.py
 The browser opens automatically at <http://127.0.0.1:5001>. The server binds to
 `0.0.0.0` so field nodes on the same network can reach it.
 
-Four pages: **overview** (live metrics, the disease pie chart, the reading log
-and the trend charts), **field node** (connect an ESP32 by IP), **vision**
-(leaf and sky photo classifiers) and **advisory** (run the pipeline with live
-weather, get ranked actions and a downloadable report).
+Three pages: **overview** (live metrics, the disease pie chart, the reading log
+and the trend charts), **vision** (leaf and sky photo classifiers) and
+**advisory** (run the pipeline with live weather, get ranked actions and a
+report). Navigation is three tabs in the top bar; there is no sidebar and no
+simulated node, so the overview stays empty until real hardware reports.
 
 ### 3. Connect an ESP32 field node
 
@@ -65,16 +66,25 @@ POST http://<your-pc-ip>:5001/api/sensor-data
 }
 ```
 
-Open the **Field node** page, type the ESP32's IP address (for example
-`192.168.1.50`) and press **Connect**. The dashboard lists known nodes, shows
-online/idle state, and the overview then renders that node's live telemetry
-through the Random Forest heads.
+As soon as the node posts, the overview fills in: the top bar shows the node as
+live and the page renders its telemetry through the Random Forest heads. Until
+then the overview shows an empty state naming the endpoint, because the
+dashboard never invents data.
+
+To see it working without hardware, post a reading by hand:
+
+```bash
+curl -X POST http://127.0.0.1:5001/api/sensor-data \
+  -H 'Content-Type: application/json' \
+  -d '{"device_id":"FARM_01","soil_moisture":44,"air_temperature":27.3,
+       "humidity":64.8,"light_intensity":585.2}'
+```
 
 | Endpoint | Purpose |
 | :--- | :--- |
 | `POST /api/sensor-data` | ingest a firmware payload, returns crop state and yield forecast |
 | `GET /api/devices` | known nodes with IP, last reading and online state |
-| `GET /api/latest` | latest reading mapped to the 8-feature model schema |
+| `GET /api/latest` | latest reading mapped to the 8-feature model schema (`source: none` until a node reports) |
 
 Four features map straight from the hardware (temperature, humidity, moisture,
 light). `ph`, `nitrogen`, `phosphorus` and `potassium` are **estimated** from soil
