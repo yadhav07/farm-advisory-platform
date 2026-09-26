@@ -1,23 +1,37 @@
 # One-click deploy to Render: https://render.com/deploy
 #
-# The repo carries its own trained artifacts (~130 MB), so the image build is
-# mostly a dependency install. Models load lazily, which is why one worker with
-# a few threads is the right shape here: a second worker would hold a second
-# copy of every model in memory.
+# The repo carries its own trained artifacts (~130 MB), so the build is mostly
+# a dependency install. Models load lazily, which is why one worker with a few
+# threads is the right shape: a second worker would hold a second copy of every
+# model in memory.
 #
-# Note on sizing: the first request to /vision/leaf or /vision/sky loads
-# EfficientNet-B0 and the weather CNN into RAM. The free tier is likely to be
-# tight for that; a paid instance with at least 2 GB is recommended.
+# Build notes:
+#   * The web layer runs every model on CPU (DEVICE = 'cpu' in
+#     web_ui/model_service.py), so we install the CPU-only torch wheels. The
+#     default PyPI torch wheel is a CUDA build that drags in ~2 GB of nvidia-*
+#     packages and will exhaust the instance disk.
+#   * torch is installed FIRST and pinned to the +cpu local version. PEP 440
+#     says a specifier without a local segment matches any local version, so the
+#     later `pip install -r requirements.txt` sees 2.13.0+cpu as satisfying
+#     torch==2.13.0 and does not pull the CUDA build back in.
+#   * Sizing: the first request to /vision/leaf or /vision/sky loads
+#     EfficientNet-B0 and the weather CNN into RAM. Budget at least 2 GB.
 services:
   - type: web
     name: farm-advisory-platform
     runtime: python
     plan: starter
-    buildCommand: pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
-    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 wsgi:application
+    buildCommand: >-
+      pip install --index-url https://download.pytorch.org/whl/cpu
+      torch==2.13.0+cpu torchvision==0.28.0+cpu
+      && pip install -r requirements.txt
+    startCommand: >-
+      gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
+      wsgi:application
     healthCheckPath: /healthz
+    autoDeploy: true
     envVars:
       - key: PYTHON_VERSION
-        value: "3.12.11"
+        value: "3.12"
       - key: THREADS
         value: "4"
