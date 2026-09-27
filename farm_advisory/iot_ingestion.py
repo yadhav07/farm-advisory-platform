@@ -13,8 +13,7 @@ The agronomy platform has two ways to obtain soil/plant telemetry:
 
 A single reading uses the standard 8-feature schema:
 
-    Temperature, Humidity, Moisture, Nitrogen,
-    Phosphorus, Potassium, PH, Light_Intensity
+    Temperature, Humidity, Moisture, PH, Light_Intensity
 """
 
 import os
@@ -33,9 +32,6 @@ FEATURE_RANGES = {
     'Humidity': (30.0, 95.0),
     'Moisture': (10.0, 80.0),
     'PH': (4.5, 8.5),
-    'Nitrogen': (10.0, 100.0),
-    'Phosphorus': (10.0, 80.0),
-    'Potassium': (10.0, 80.0),
     'Light_Intensity': (200.0, 1000.0),
 }
 
@@ -45,9 +41,6 @@ BASE_VALUES = {
     'Humidity': 62.0,
     'Moisture': 48.0,
     'PH': 6.6,
-    'Nitrogen': 48.0,
-    'Phosphorus': 42.0,
-    'Potassium': 40.0,
     'Light_Intensity': 620.0,
 }
 
@@ -97,8 +90,7 @@ class SimulatedSensorNode:
         self._apply_stress(reading)
         reading['PH'] = round(reading['PH'], 2)
         reading['Light_Intensity'] = round(reading['Light_Intensity'], 1)
-        for f in ('Temperature', 'Humidity', 'Moisture', 'Nitrogen',
-                  'Phosphorus', 'Potassium'):
+        for f in ('Temperature', 'Humidity', 'Moisture'):
             reading[f] = round(reading[f], 2)
 
         return {
@@ -115,8 +107,13 @@ class SimulatedSensorNode:
         if profile == 'moisture-stress' and roll < 0.18:
             reading['Moisture'] = _clip(reading['Moisture'] - 20.0, 'Moisture')
         elif profile == 'nutrient-stress' and roll < 0.15:
-            reading['Nitrogen'] = _clip(reading['Nitrogen'] - 22.0, 'Nitrogen')
-            reading['Potassium'] = _clip(reading['Potassium'] - 12.0, 'Potassium')
+            # Nutrient stress used to push nitrogen and potassium down. Those
+            # features were removed, so the profile now expresses itself
+            # through the acidity and light conditions that drive nutrient
+            # availability in the field.
+            reading['PH'] = _clip(reading['PH'] - 1.4, 'PH')
+            reading['Light_Intensity'] = _clip(reading['Light_Intensity'] * 0.7,
+                                               'Light_Intensity')
         elif profile == 'humidity-stress' and roll < 0.16:
             reading['Humidity'] = _clip(reading['Humidity'] + 18.0, 'Humidity')
             reading['Temperature'] = _clip(reading['Temperature'] + 2.0, 'Temperature')
@@ -175,8 +172,7 @@ class SensorIngestion:
             print(f"[{stored['timestamp']}] node={stored['node_id']} "
                   f"T={stored['Temperature']:>5.2f} H={stored['Humidity']:>5.1f} "
                   f"M={stored['Moisture']:>5.1f} pH={stored['PH']:>4.2f} "
-                  f"N={stored['Nitrogen']:>5.1f} P={stored['Phosphorus']:>5.1f} "
-                  f"K={stored['Potassium']:>5.1f} L={stored['Light_Intensity']:>6.1f}")
+                  f"L={stored['Light_Intensity']:>6.1f}")
             if step < steps - 1:
                 time.sleep(interval_seconds)
         return self._count

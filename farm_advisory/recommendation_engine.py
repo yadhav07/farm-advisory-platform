@@ -215,27 +215,21 @@ class RecommendationEngine:
         if ph < thr['PH']['low']:
             adv.append({'priority': 'Medium', 'category': 'Soil Amendment',
                         'action': f'Apply agricultural lime (~250-400 kg/acre) to raise pH.',
-                        'rationale': f'Soil pH {ph} is acidic (below {thr["PH"]["low"]}); nutrients '
-                                     'like phosphorus fixate in acidic soil.'})
+                        'rationale': f'Soil pH {ph} is acidic (below {thr["PH"]["low"]}); '
+                                     'nutrient availability drops in acidic soil.'})
         elif ph > thr['PH']['high']:
             adv.append({'priority': 'Medium', 'category': 'Soil Amendment',
                         'action': 'Apply elemental sulfur / ammonium-based fertilizers to lower pH.',
                         'rationale': f'Soil pH {ph} is alkaline (above {thr["PH"]["high"]}); iron and '
                                      'zinc availability drops in alkaline soil.'})
 
-        # 4. Macro nutrients.
-        for nutrient, label in (('Nitrogen', 'N'), ('Phosphorus', 'P'), ('Potassium', 'K')):
-            low = thr[nutrient].get('low')
-            if low and readings[nutrient] < low:
-                doses = {'Nitrogen': '40-60 kg N/ha urea topdressing',
-                         'Phosphorus': '30-40 kg P2O5/ha (DAP/SSP)',
-                         'Potassium': '25-35 kg K2O/ha (MOP)'}
-                adv.append({'priority': 'Medium', 'category': 'Fertilization',
-                            'action': doses[nutrient],
-                            'rationale': f'{label} level {readings[nutrient]:.1f} is below the '
-                                         f'{low} threshold - deficiency detected.'})
+        # NOTE: the nitrogen / phosphorus / potassium advisories were removed
+        # along with the features themselves. No probe reports nutrient
+        # levels, so the engine has nothing to base a fertilization dose on.
+        # A soil lab test is the right input for that, not a number invented
+        # from the other four sensors.
 
-        # 5. Temperature / humidity stress.
+        # 4. Temperature / humidity stress.
         temp, hum = readings['Temperature'], readings['Humidity']
         if temp > thr['Temperature']['high']:
             adv.append({'priority': 'Medium', 'category': 'Heat Management',
@@ -387,7 +381,6 @@ if __name__ == '__main__':
         'node_id': 'SIM-CHECK',
         'crop': CROP_NAME,
         'Temperature': 26.0, 'Humidity': 60.0, 'Moisture': 48.0,
-        'Nitrogen': 48.0, 'Phosphorus': 42.0, 'Potassium': 40.0,
         'PH': 6.6, 'Light_Intensity': 620.0,
     }
     result = engine.analyze(sample, weather=None)

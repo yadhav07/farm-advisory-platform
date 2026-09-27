@@ -6,8 +6,8 @@
  *   1. the JSON payload is also served over HTTP (GET /api/sensor-data), so a
  *      dashboard can be pointed at this node by IP address and pull readings
  *      directly instead of waiting for the next push;
- *   2. optional soil-pH / NPK probes are read when present and sent in the
- *      payload, replacing the dashboard's estimated values;
+ *   2. an optional soil-pH probe is read when present and sent in the
+ *      payload, replacing the dashboard's estimated value;
  *   3. a MAC-derived device id is used unless DEVICE_ID is overridden.
  *
  * Wiring (unchanged):
@@ -60,9 +60,6 @@ const uint16_t NODE_PORT = 8080;
 
 // Optional probes - set to a GPIO to enable, or -1 to leave them out.
 #define SOIL_PH_PIN -1
-#define NITROGEN_PIN -1
-#define PHOSPHORUS_PIN -1
-#define POTASSIUM_PIN -1
 
 // Calibration from testing the actual sensor.
 int SOIL_DRY_VALUE = 3000;
@@ -98,9 +95,6 @@ struct Reading {
   float bmeTemperature = 0;
   float pressure = 0;
   float ph = -1;
-  float nitrogen = -1;
-  float phosphorus = -1;
-  float potassium = -1;
 };
 Reading current;
 
@@ -184,15 +178,6 @@ Reading readSensors()
   }
 
   r.ph = readOptionalAnalog(SOIL_PH_PIN, 3000, 1000);
-#if NITROGEN_PIN >= 0
-  r.nitrogen = analogRead(NITROGEN_PIN);
-#endif
-#if PHOSPHORUS_PIN >= 0
-  r.phosphorus = analogRead(PHOSPHORUS_PIN);
-#endif
-#if POTASSIUM_PIN >= 0
-  r.potassium = analogRead(POTASSIUM_PIN);
-#endif
 
   return r;
 }
@@ -248,9 +233,6 @@ String buildJson(const Reading& r)
   json += "\"pressure\":" + String(r.pressure, 2);
 
   if (r.ph >= 0)          json += ",\"ph\":" + String(r.ph, 2);
-  if (r.nitrogen >= 0)    json += ",\"nitrogen\":" + String(r.nitrogen, 1);
-  if (r.phosphorus >= 0)  json += ",\"phosphorus\":" + String(r.phosphorus, 1);
-  if (r.potassium >= 0)   json += ",\"potassium\":" + String(r.potassium, 1);
 
   json += "}";
   return json;

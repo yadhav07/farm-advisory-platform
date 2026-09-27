@@ -24,8 +24,7 @@ SATELLITE_MODEL_PATH = os.path.join(
 )
 
 SENSOR_FEATURES = [
-    'Temperature', 'Humidity', 'Moisture', 'Nitrogen',
-    'Phosphorus', 'Potassium', 'PH', 'Light_Intensity',
+    'Temperature', 'Humidity', 'Moisture', 'PH', 'Light_Intensity',
 ]
 
 # Field guidance shown in HTML forms (matches sensor_model/test.py).
@@ -36,12 +35,6 @@ SENSOR_FIELD_GUIDE = [
      'low': 30.0, 'high': 95.0, 'step': 0.1, 'default': 62.0},
     {'name': 'Moisture', 'label': 'Soil Moisture', 'unit': '%',
      'low': 10.0, 'high': 80.0, 'step': 0.1, 'default': 48.0},
-    {'name': 'Nitrogen', 'label': 'Nitrogen (N)', 'unit': 'mg/kg',
-     'low': 10.0, 'high': 100.0, 'step': 0.1, 'default': 48.0},
-    {'name': 'Phosphorus', 'label': 'Phosphorus (P)', 'unit': 'mg/kg',
-     'low': 10.0, 'high': 80.0, 'step': 0.1, 'default': 42.0},
-    {'name': 'Potassium', 'label': 'Potassium (K)', 'unit': 'mg/kg',
-     'low': 10.0, 'high': 80.0, 'step': 0.1, 'default': 40.0},
     {'name': 'PH', 'label': 'Soil pH', 'unit': 'pH',
      'low': 4.5, 'high': 8.5, 'step': 0.05, 'default': 6.6},
     {'name': 'Light_Intensity', 'label': 'Light Intensity', 'unit': 'lux',

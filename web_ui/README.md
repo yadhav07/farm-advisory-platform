@@ -111,8 +111,13 @@ The ESP32 firmware in `../hardware/esp32_farm_node/` pushes readings here:
 client can tell "no data yet" from "a node is reporting".
 
 Payload keys: `device_id`, `soil_moisture`, `air_temperature`, `humidity`,
-`light_intensity`, `mq135_raw`, `bme_temperature`, `pressure`. Optional `ph`,
-`nitrogen`, `phosphorus` and `potassium` replace the estimated values.
+`light_intensity`, `mq135_raw`, `bme_temperature`, `pressure`. An optional `ph`
+replaces the estimated soil pH.
+
+The model reads five features: `Temperature`, `Humidity`, `Moisture`, `PH` and
+`Light_Intensity`. Nitrogen, phosphorus and potassium were removed because no
+probe reports them - the dashboard was showing three invented numbers on every
+reading. A soil lab test is the right source for those, not a sensor guess.
 
 There is no connection page. `DeviceRegistry.probe(ip)` in
 `../farm_advisory/device_ingest.py` still probes a node directly

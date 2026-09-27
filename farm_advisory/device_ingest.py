@@ -15,29 +15,33 @@ Firmware payload
       "humidity": 62.1,           # %      (DHT11)
       "light_intensity": 620.5,   # lux    (BH1750)
       "mq135_raw": 1180,          # ADC    (MQ-135 air quality)
+                                 # optional: "ph" when a probe is fitted
       "bme_temperature": 25.1,    # degC   (BME280)
       "pressure": 1013.2          # hPa    (BME280)
     }
 
 Sensor mapping
 --------------
-Four of the eight model features are measured directly:
+Four of the five model features are measured directly:
 
-===================  =========================
+======================  =========================
 Model feature        Source
-===================  =========================
+======================  =========================
 ``Temperature``      ``air_temperature`` (DHT11)
 ``Humidity``         ``humidity`` (DHT11)
 ``Moisture``         ``soil_moisture``
 ``Light_Intensity``  ``light_intensity`` (BH1750)
-===================  =========================
+======================  =========================
 
-``PH``, ``Nitrogen``, ``Phosphorus`` and ``Potassium`` need dedicated probes.
-The firmware may send them (``ph``, ``nitrogen``, ``phosphorus``, ``potassium``)
-and they are then used verbatim. When they are absent they are *estimated* from
-soil moisture and the MQ-135 air-quality reading, so the classifier still has a
-complete row. Every reading is tagged with a ``provenance`` map so the UI can
-show which values are measured and which are estimated.
+``PH`` needs a dedicated probe. The firmware may send it (``ph``) and it is
+then used verbatim; when absent it is *estimated* from soil moisture, so the
+classifier still has a complete row. Every reading is tagged with a
+``provenance`` map so the UI can show which values are measured and which are
+estimated.
+
+Nitrogen, phosphorus and potassium were removed from the schema: no probe
+reports them, so the dashboard was displaying three invented numbers on every
+reading. A soil lab test is the right source for those, not a sensor guess.
 
 ``mq135_raw``, ``bme_temperature`` and ``pressure`` are kept as context signals
 and displayed, but are not part of the model schema.
@@ -58,8 +62,8 @@ DEVICE_LOG_PATH = os.path.join(PROJECT_ROOT, 'farm_advisory', 'dataset',
 DEVICE_REGISTRY_PATH = os.path.join(PROJECT_ROOT, 'farm_advisory', 'dataset',
                                     'devices.json')
 
-# Healthy-farm baselines used when a probe is not fitted.
-BASELINE = {'PH': 6.6, 'Nitrogen': 48.0, 'Phosphorus': 42.0, 'Potassium': 40.0}
+# Healthy-farm pH baseline used when no probe is fitted.
+BASELINE = {'PH': 6.6}
 
 # Physical bounds shared with the simulator, used to clamp incoming values.
 BOUNDS = {
@@ -67,9 +71,6 @@ BOUNDS = {
     'Humidity': (30.0, 95.0),
     'Moisture': (10.0, 80.0),
     'PH': (4.5, 8.5),
-    'Nitrogen': (10.0, 100.0),
-    'Phosphorus': (10.0, 80.0),
-    'Potassium': (10.0, 80.0),
     'Light_Intensity': (200.0, 1000.0),
 }
 
@@ -100,7 +101,7 @@ def _number(payload, *keys):
 
 
 def map_to_sensor_schema(payload):
-    """Map a firmware payload onto the 8-feature schema plus context signals.
+    """Map a firmware payload onto the 5-feature schema plus context signals.
 
     Returns ``(sensor, context, provenance)``.
     """
@@ -116,18 +117,17 @@ def map_to_sensor_schema(payload):
         raise ValueError('payload must include soil_moisture, '
                          'air_temperature and humidity')
 
-    # Estimated nutrient / pH baseline, adjusted by soil wetness and gas load.
+    # Soil pH is the only value still estimated when no probe is fitted: it is
+    # nudged by how wet the soil is, since waterlogged and dry beds both drift
+    # off the neutral baseline.
     wet_delta = ((moisture if moisture is not None else 48.0) - 48.0) / 100.0
+    estimated = {'PH': 6.6 - 0.8 * wet_delta}
+
+    # MQ-135 air quality is a context signal only; it is not a model feature.
+    # It still gets a normalised 0-100 index for display.
     gas_load = 0.0
     if mq135 is not None:
         gas_load = max(0.0, min(1.0, (mq135 - MQ135_MIN) / (MQ135_MAX - MQ135_MIN)))
-
-    estimated = {
-        'PH': 6.6 - 0.8 * wet_delta,
-        'Nitrogen': 48.0 + 18.0 * wet_delta - 10.0 * gas_load,
-        'Phosphorus': 42.0 + 12.0 * wet_delta,
-        'Potassium': 40.0 + 10.0 * wet_delta,
-    }
 
     measured_map = {
         'Temperature': temperature,

@@ -12,17 +12,13 @@ MODEL_PATH = os.path.join(BASE_DIR, 'rf_model.joblib')
 THRESHOLDS_PATH = os.path.join(BASE_DIR, 'dataset', 'selected_thresholds.json')
 
 FEATURES = [
-    'Temperature', 'Humidity', 'Moisture', 'Nitrogen',
-    'Phosphorus', 'Potassium', 'PH', 'Light_Intensity'
+    'Temperature', 'Humidity', 'Moisture', 'PH', 'Light_Intensity'
 ]
 
 INPUT_RANGES = {
     'Temperature': {'ideal': (20.0, 30.0), 'label': '°C'},
     'Humidity': {'ideal': (55.0, 85.0), 'label': '%'},
     'Moisture': {'ideal': (40.0, 70.0), 'label': '%'},
-    'Nitrogen': {'ideal': (30.0, 70.0), 'label': 'mg/kg'},
-    'Phosphorus': {'ideal': (20.0, 50.0), 'label': 'mg/kg'},
-    'Potassium': {'ideal': (20.0, 60.0), 'label': 'mg/kg'},
     'PH': {'ideal': (6.0, 7.5), 'label': 'pH'},
     'Light_Intensity': {'ideal': (400.0, 800.0), 'label': 'lux'},
 }

@@ -1,0 +1,100 @@
+{
+  "crop": "Wheat",
+  "node_id": "SIM-HEALTHY",
+  "timestamp": "2026-09-27T20:10:01",
+  "sensor": {
+    "Temperature": 22.46,
+    "Humidity": 76.96,
+    "Moisture": 49.08,
+    "PH": 5.59,
+    "Light_Intensity": 365.4,
+    "disease_prediction": "Healthy",
+    "disease_probabilities": {
+      "Bacterial_Leaf_Spot": 0.004475954153373507,
+      "Early_Blight": 0.1645168255679046,
+      "Healthy": 0.4386366458422795,
+      "Powdery_Mildew": 0.032174901969465715,
+      "Root_Rot": 0.19137764425950154,
+      "Rust": 0.168818028207475
+    },
+    "top_disease_risk": {
+      "disease": "Root_Rot",
+      "probability": 0.19137764425950154
+    },
+    "yield_forecast": 45.28
+  },
+  "weather": {
+    "source": "open-meteo",
+    "latitude": 28.6139,
+    "longitude": 77.209,
+    "observed_at": "2026-09-27T20:00",
+    "temperature": 23.4,
+    "humidity": 84,
+    "precipitation_mm": 0.0,
+    "wind_speed_kmh": 6.5,
+    "weather_code": 0,
+    "weather_label": "Clear sky",
+    "forecast": {
+      "dates": [
+        "2026-09-27",
+        "2026-09-28",
+        "2026-09-29"
+      ],
+      "t_max": [
+        28.6,
+        29.3,
+        31.3
+      ],
+      "t_min": [
+        22.1,
+        21.2,
+        23.3
+      ],
+      "precip_probability": [
+        86,
+        20,
+        13
+      ],
+      "precip_sum": [
+        1.1,
+        0.2,
+        0.1
+      ]
+    }
+  },
+  "leaf": {
+    "image": "D:\\Multidisciplinary_Project\\leaf_disease_model\\dataset\\test\\01dfb88b-cd5a-420c-b163-51f5fe07b74d___JR_B-Spot-9091_JPG.rf.6a71c0d99eea0a2d8ee98036d4dfb92f.jpg",
+    "prediction": "pepper bell bacterial spot",
+    "probability": 0.8711850047111511,
+    "all_probabilities": {
+      "pepper bell bacterial spot": 0.8711850047111511,
+      "pepper bell healthy": 0.021868178620934486,
+      "potato early blight": 0.05936412885785103,
+      "potato healthy": 0.02163027785718441,
+      "potato late blight": 0.009343420155346394,
+      "tomato target spot": 0.01660907454788685
+    }
+  },
+  "sky": null,
+  "recommendations": [
+    {
+      "priority": "High",
+      "category": "Irrigation & Spraying",
+      "action": "Delay irrigation and avoid foliar spraying over the next 24-48h.",
+      "rationale": "Rainfall is expected in the forecast window - spraying would be washed off and irrigation would be wasteful."
+    },
+    {
+      "priority": "High",
+      "category": "Leaf Disease",
+      "action": "Pepper Bell Bacterial Spot detected on the leaf image - isolate affected plants, remove infected foliage and apply a registered treatment.",
+      "rationale": "Leaf image classifier reports Pepper Bell Bacterial Spot with 87.1% confidence."
+    },
+    {
+      "priority": "Medium",
+      "category": "Soil Amendment",
+      "action": "Apply agricultural lime (~250-400 kg/acre) to raise pH.",
+      "rationale": "Soil pH 5.59 is acidic (below 6.0); nutrient availability drops in acidic soil."
+    }
+  ],
+  "summary": "Action recommended - crop state: Healthy; yield forecast: 45.28; 3 advisory action(s)."
+}

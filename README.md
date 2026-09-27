@@ -19,7 +19,7 @@ each self-contained and runnable on its own.
 | `farm_advisory` | Fusion layer | Fuses all models + live weather into prioritized agronomic actions and delivers reports | — |
 
 The advisory layer turns model output into concrete instructions — irrigation
-timing, nutrient top-dressing, pH correction, disease control and safe spraying
+timing, pH correction, disease control and safe spraying
 windows — each with a plain-language rationale, ranked High / Medium / Low.
 
 ---
@@ -142,7 +142,7 @@ curl -X POST http://127.0.0.1:5001/api/sensor-data \
 | :--- | :--- |
 | `POST /api/sensor-data` | ingest a firmware payload, returns crop state and yield forecast |
 | `GET /api/devices` | known nodes with IP, last reading and online state |
-| `GET /api/latest` | latest reading mapped to the 8-feature model schema (`source: none` until a node reports) |
+| `GET /api/latest` | latest reading mapped to the 5-feature model schema (`source: none` until a node reports) |
 
 Four features map straight from the hardware (temperature, humidity, moisture,
 light). `ph`, `nitrogen`, `phosphorus` and `potassium` are **estimated** from soil
@@ -224,7 +224,7 @@ architecture details and comparisons.
 ## Data sources
 
 * **Sensor telemetry** — field-style datasets for temperature, humidity, soil
-  moisture, pH and NPK levels, with a synthesized `Yield_Rate` target.
+  moisture, pH and light intensity, with a synthesized `Yield_Rate` target.
 * **Leaf imagery** — multi-class leaf disease photographs (pepper, potato,
   tomato) with healthy counterparts.
 * **Weather imagery** — labelled sky/field photographs across cloud, rain, shine

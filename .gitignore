@@ -18,9 +18,16 @@ farm_advisory/dataset/weather_cache.json
 farm_advisory/dataset/device_readings.csv
 farm_advisory/dataset/devices.json
 
-# Generated advisory reports (recreate them by running the pipeline)
+# CLI telemetry log. It grows on every pipeline run and its column set
+# changes with the model schema, so it is local state rather than source.
+farm_advisory/dataset/sensor_log.csv
+
+# Generated advisory reports. The three SIM-* reports are a committed demo
+# set produced by `farm_advisory/test.py`, so they are exempted below.
 farm_advisory/outputs/advisory_*.md
 farm_advisory/outputs/advisory_*.json
+!farm_advisory/outputs/advisory_SIM-*.md
+!farm_advisory/outputs/advisory_SIM-*.json
 
 # OS / editor
 .DS_Store

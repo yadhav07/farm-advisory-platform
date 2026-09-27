@@ -67,8 +67,8 @@ def format_markdown(analysis):
     lines.append('')
     lines.append('| Feature | Reading |')
     lines.append('| --- | --- |')
-    for feature in ('Temperature', 'Humidity', 'Moisture', 'Nitrogen',
-                    'Phosphorus', 'Potassium', 'PH', 'Light_Intensity'):
+    for feature in ('Temperature', 'Humidity', 'Moisture',
+                    'PH', 'Light_Intensity'):
         if feature in sensor:
             lines.append(f'| {feature} | {_fmt_float(sensor[feature])} |')
     if sensor.get('yield_forecast') is not None:
@@ -228,7 +228,6 @@ if __name__ == '__main__':
         'crop': 'Wheat', 'node_id': 'DEMO', 'timestamp': dt.datetime.now().isoformat(timespec='seconds'),
         'summary': 'Demo report only',
         'sensor': {'Temperature': 26.0, 'Humidity': 60.0, 'Moisture': 48.0,
-                   'Nitrogen': 48.0, 'Phosphorus': 42.0, 'Potassium': 40.0,
                    'PH': 6.6, 'Light_Intensity': 620.0, 'disease_prediction': 'Healthy',
                    'yield_forecast': 70.0},
         'weather': None, 'leaf': None, 'sky': None,

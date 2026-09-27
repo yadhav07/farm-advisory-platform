@@ -22,9 +22,6 @@ FEATURE_LABELS = {
     'Temperature': 'Temp',
     'Humidity': 'Humidity',
     'Moisture': 'Moisture',
-    'Nitrogen': 'Nitrogen',
-    'Phosphorus': 'Phosphorus',
-    'Potassium': 'Potassium',
     'PH': 'pH',
     'Light_Intensity': 'Light',
 }

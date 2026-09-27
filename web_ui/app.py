@@ -104,16 +104,23 @@ def save_upload(file_storage):
 
 
 def parse_sensor_form(form):
-    """Pull the eight telemetry features from a form; returns (values, error)."""
-    values = {}
+    """Pull the five telemetry features from a form; returns (values, error).
+
+    On a missing or unparseable field the values parsed so far are still
+    returned, layered over the guide defaults. The caller skips the analysis
+    when `error` is set, but the page still has to render its sliders, and
+    handing it ``None`` used to crash the template with
+    "'None' has no attribute 'get'".
+    """
+    values = sensor_values_for_defaults()
     for field in model_service.SENSOR_FEATURES:
         raw = (form.get(field) or '').strip()
         if not raw:
-            return None, f'Missing reading for "{field}".'
+            return values, f'Missing reading for "{field}".'
         try:
             values[field] = float(raw)
         except ValueError:
-            return None, f'"{raw}" is not a valid number for {field}.'
+            return values, f'"{raw}" is not a valid number for {field}.'
     return values, None
 
 

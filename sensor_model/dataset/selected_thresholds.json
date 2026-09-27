@@ -14,7 +14,7 @@
   "Early_Blight": {
     "Temperature": 24.0,
     "Humidity": 65.0,
-    "Nitrogen": 35.0
+    "PH": 6.0
   },
   "Rust": {
     "Temperature": 24.0,

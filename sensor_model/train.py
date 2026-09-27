@@ -9,21 +9,32 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
 
+# The five features the models are trained on. Nitrogen, phosphorus and
+# potassium were removed: no probe reports them, so the dashboard was showing
+# three invented values on every reading.
+FEATURES = [
+    'Temperature', 'Humidity', 'Moisture', 'PH', 'Light_Intensity'
+]
+
 # Configurable fallback ranges for synthesized sensor features.
 # Change these if you want different value limits for the generated CSV labels.
 FEATURE_FALLBACK_RANGES = {
-    'Nitrogen': (10.0, 100.0),
-    'Phosphorus': (10.0, 80.0),
-    'Potassium': (10.0, 80.0),
     'Light_Intensity': (200.0, 1000.0),
 }
 
 # Configurable disease classification thresholds.
 # Change these values to make the rule-based labeler more or less strict.
+#
+# With only five features the six classes still have to be separable, so each
+# rule keys on a different dimension: Root_Rot on moisture+pH, Powdery_Mildew
+# on low light, Early_Blight on pH being low-to-neutral, Rust on cool
+# temperature, Bacterial_Leaf_Spot on pH being alkaline. Early_Blight must
+# therefore cap pH, otherwise it would swallow every Bacterial_Leaf_Spot row
+# (it is evaluated first and its old nitrogen test no longer exists).
 DISEASE_RULE_THRESHOLDS = {
     'Root_Rot': {'Moisture': 60.0, 'PH': 5.8},
     'Powdery_Mildew': {'Temperature': (20.0, 28.0), 'Humidity': 80.0, 'Light_Intensity': 400.0},
-    'Early_Blight': {'Temperature': 28.0, 'Humidity': 75.0, 'Nitrogen': 40.0},
+    'Early_Blight': {'Temperature': 28.0, 'Humidity': 75.0, 'PH': 6.8},
     'Rust': {'Temperature': 22.0, 'Humidity': 85.0, 'Moisture': 50.0},
     'Bacterial_Leaf_Spot': {'Temperature': 25.0, 'Humidity': 80.0, 'PH': 7.2},
 }
@@ -44,9 +55,6 @@ DEFAULT_FEATURE_BOUNDS = {
     'Humidity': (30.0, 95.0),
     'Moisture': (10.0, 80.0),
     'PH': (4.5, 8.5),
-    'Nitrogen': (10.0, 100.0),
-    'Phosphorus': (10.0, 80.0),
-    'Potassium': (10.0, 80.0),
     'Light_Intensity': (200.0, 1000.0),
 }
 
@@ -83,9 +91,6 @@ def synthesize_features(df_base, df_plant, seed=42):
     # Use observed distributions from plant_health_data.csv and the base file when available.
     # Otherwise synthesize values using configurable fallback ranges and empirical bounds.
     for col, out_col in [
-        ('Nitrogen_Level', 'Nitrogen'),
-        ('Phosphorus_Level', 'Phosphorus'),
-        ('Potassium_Level', 'Potassium'),
         ('Light_Intensity', 'Light_Intensity'),
     ]:
         if col in df_plant.columns:
@@ -105,11 +110,12 @@ def classify_disease(row, thresholds=None):
     temp = row['Temperature']
     hum = row['Humidity']
     moist = row['Moisture']
-    nitro = row['Nitrogen']
     ph = row['PH']
     light = row['Light_Intensity']
 
-    # Deterministic agronomic rules (priority order), using configurable thresholds
+    # Deterministic agronomic rules (priority order), using configurable
+    # thresholds. Each disease keys on a different dimension so the classes
+    # stay separable without the nutrient features.
     rt = thresholds
     if moist > rt['Root_Rot']['Moisture'] and ph < rt['Root_Rot']['PH']:
         return 'Root_Rot'
@@ -118,8 +124,10 @@ def classify_disease(row, thresholds=None):
     if pm['Temperature'][0] <= temp <= pm['Temperature'][1] and hum > pm['Humidity'] and light < pm['Light_Intensity']:
         return 'Powdery_Mildew'
 
+    # Early_Blight caps pH so it does not absorb the alkaline
+    # Bacterial_Leaf_Spot band, which is evaluated afterwards.
     eb = rt['Early_Blight']
-    if temp >= eb['Temperature'] and hum > eb['Humidity'] and nitro < eb['Nitrogen']:
+    if temp >= eb['Temperature'] and hum > eb['Humidity'] and ph < eb['PH']:
         return 'Early_Blight'
 
     rs = rt['Rust']
@@ -163,7 +171,8 @@ def make_disease_row(sample_row, disease, thresholds, rng, source_df):
     elif disease == 'Early_Blight':
         row['Temperature'] = rng.uniform(thr['Temperature'], min(35.0, thr['Temperature'] + 8.0))
         row['Humidity'] = rng.uniform(thr['Humidity'] + 1.0, min(95.0, thr['Humidity'] + 15.0))
-        row['Nitrogen'] = rng.uniform(max(10.0, thr['Nitrogen'] - 15.0), thr['Nitrogen'] - 1.0)
+        # keep pH below the Bacterial_Leaf_Spot band so the classes stay disjoint
+        row['PH'] = rng.uniform(max(4.5, thr['PH'] - 2.0), thr['PH'] - 0.05)
     elif disease == 'Rust':
         row['Temperature'] = rng.uniform(max(15.0, thr['Temperature'] - 6.0), thr['Temperature'] - 0.5)
         row['Humidity'] = rng.uniform(thr['Humidity'] + 1.0, min(95.0, thr['Humidity'] + 12.0))
@@ -172,7 +181,7 @@ def make_disease_row(sample_row, disease, thresholds, rng, source_df):
         row['Temperature'] = rng.uniform(thr['Temperature'], min(35.0, thr['Temperature'] + 10.0))
         row['Humidity'] = rng.uniform(thr['Humidity'] + 1.0, min(95.0, thr['Humidity'] + 12.0))
         row['PH'] = rng.uniform(thr['PH'] + 0.1, min(8.5, thr['PH'] + 0.8))
-    for key in ['Temperature', 'Humidity', 'Moisture', 'Nitrogen', 'Phosphorus', 'Potassium', 'PH', 'Light_Intensity']:
+    for key in FEATURES:
         if key not in row or pd.isna(row[key]):
             lo, hi = get_feature_bounds(source_df, key)
             row[key] = rng.uniform(lo, hi)
@@ -197,18 +206,19 @@ def augment_disease_counts(df, thresholds, min_counts, seed=42):
 def synthesize_yield_rate(df, seed=42):
     rng = np.random.default_rng(seed)
     # Build a synthetic yield score from feature balances.
+    # The original formula weighted nitrogen 0.20, phosphorus 0.15 and
+    # potassium 0.15. With those inputs gone the remaining weights are
+    # rescaled to still sum to 1.0, so the score keeps the same 10-100 range
+    # and the same meaning: better conditions, higher yield.
     def normalize(series, lo, hi):
         return np.clip((series - lo) / (hi - lo), 0.0, 1.0)
 
-    n = normalize(df['Nitrogen'], 10.0, 100.0)
-    p = normalize(df['Phosphorus'], 10.0, 80.0)
-    k = normalize(df['Potassium'], 10.0, 80.0)
     moisture = normalize(df['Moisture'], 20.0, 70.0)
     ph = normalize(df['PH'], 5.0, 8.0)
     light = normalize(df['Light_Intensity'], 200.0, 1000.0)
     hum = normalize(df['Humidity'], 30.0, 90.0)
 
-    score = 0.2 * n + 0.15 * p + 0.15 * k + 0.2 * moisture + 0.15 * ph + 0.1 * light + 0.05 * hum
+    score = 0.40 * moisture + 0.30 * ph + 0.20 * light + 0.10 * hum
     yield_rate = 20.0 + 60.0 * score + rng.normal(0, 4.0, size=len(df))
     df['Yield_Rate'] = np.clip(yield_rate, 10.0, 100.0)
     return df
@@ -231,7 +241,7 @@ def sample_threshold_candidates(seed=42, count=20):
             'Early_Blight': {
                 'Temperature': float(rng.choice([24.0, 26.0, 28.0, 30.0])),
                 'Humidity': float(rng.choice([65.0, 70.0, 75.0, 80.0])),
-                'Nitrogen': float(rng.choice([30.0, 35.0, 40.0, 45.0]))
+                'PH': float(rng.choice([5.8, 6.0, 6.4, 6.8]))
             },
             'Rust': {
                 'Temperature': float(rng.choice([18.0, 20.0, 22.0, 24.0])),
@@ -259,7 +269,7 @@ def score_thresholds(df, thresholds):
     non_healthy_ratio = (labels != 'Healthy').mean()
     le = LabelEncoder()
     y_enc = le.fit_transform(labels)
-    X = df[['Temperature', 'Humidity', 'Moisture', 'Nitrogen', 'Phosphorus', 'Potassium', 'PH', 'Light_Intensity', 'Yield_Rate']].copy()
+    X = df[FEATURES + ['Yield_Rate']].copy()
     X = X.fillna(X.median())
     scaler = StandardScaler()
     X = scaler.fit_transform(X)
@@ -290,7 +300,7 @@ def main():
             df = synthesize_features(df_base, df_plant, seed=42)
             df['Target_Disease'] = df.apply(classify_disease, axis=1)
         else:
-            needed = ['Temperature', 'Humidity', 'Moisture', 'Nitrogen', 'Phosphorus', 'Potassium', 'PH', 'Light_Intensity']
+            needed = list(FEATURES)
             missing = [c for c in needed if c not in df.columns]
             if missing:
                 print('Missing features in CSV:', missing)
@@ -353,10 +363,14 @@ def main():
         json.dump(best_thresholds, f, indent=2)
     print('Saved selected thresholds to', json_fp)
 
-    features = [
-        'Temperature', 'Humidity', 'Moisture', 'Nitrogen',
-        'Phosphorus', 'Potassium', 'PH', 'Light_Intensity'
-    ]
+    # Drop the nutrient columns if an older dataset still carries them, so the
+    # saved CSV matches the five-feature schema the models are trained on.
+    stale = [c for c in ('Nitrogen', 'Phosphorus', 'Potassium') if c in df.columns]
+    if stale:
+        print('Dropping stale nutrient columns:', stale)
+        df = df.drop(columns=stale)
+
+    features = list(FEATURES)
 
     missing = [f for f in features if f not in df.columns]
     if missing:
@@ -405,9 +419,6 @@ def main():
     df_organic['Humidity'] = df_organic['Humidity'].round(2)
     df_organic['Moisture'] = df_organic['Moisture'].round(2)
     df_organic['PH'] = df_organic['PH'].round(2)
-    df_organic['Nitrogen'] = df_organic['Nitrogen'].round(2)
-    df_organic['Phosphorus'] = df_organic['Phosphorus'].round(2)
-    df_organic['Potassium'] = df_organic['Potassium'].round(2)
     df_organic['Light_Intensity'] = df_organic['Light_Intensity'].round(1)
     df_organic['Yield_Rate'] = df_organic['Yield_Rate'].round(2)
 

@@ -25,7 +25,7 @@ classifier = bundle.get('classifier', bundle.get('model'))
 regressor = bundle.get('regressor', None)
 label_encoder = bundle.get('label_encoder')
 
-FEATURES = ['Temperature', 'Humidity', 'Moisture', 'Nitrogen', 'Phosphorus', 'Potassium', 'PH', 'Light_Intensity']
+FEATURES = ['Temperature', 'Humidity', 'Moisture', 'PH', 'Light_Intensity']
 
 # ==========================================
 # GRAPH 1: Feature Importance 

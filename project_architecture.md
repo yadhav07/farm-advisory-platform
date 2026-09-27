@@ -19,7 +19,7 @@ Multidisciplinary_Project/
 │
 ├── sensor_model/                             # IoT Sensor & Telemetry Machine Learning Subsystem
 │   ├── dataset/
-│   │   ├── plant_health_data.csv               # Empirical plant dataset (NPK nutrient & solar light distributions)
+│   │   ├── plant_health_data.csv               # Empirical plant dataset (solar light distribution)tions)
 │   │   ├── irrigation_prediction.csv           # Telemetry dataset (Soil moisture, pH, temperature, humidity)
 │   │   ├── training_dataset_with_yield.csv     # Synthesized & noise-injected master training set
 │   │   └── selected_thresholds.json            # Optimized rule-based disease classification thresholds
@@ -93,7 +93,7 @@ Multidisciplinary_Project/
 | **`sensor_model`** | `train.py` | Python Script | Primary tabular pipeline orchestrator. Performs feature synthesis, grid search tuning of agronomic disease thresholds, minority class augmentation, measurement jitter & label noise injection, Random Forest training, cross-validation, and artifact saving. |
 | **`sensor_model`** | `test.py` | Python Script | Turnkey CLI tool for live inference. Prompts users for 8 sensor readings with ideal range guidelines, standardizes features, predicts disease diagnosis with probability distribution, and calculates `Yield_Rate`. |
 | **`sensor_model`** | `visualize.py` | Python Script | Plotting utility. Loads `rf_model.joblib` and `training_dataset_with_yield.csv` to generate slide-ready plots for feature importances, confusion matrix, and actual vs. predicted yield rates. |
-| **`sensor_model`** | `dataset/plant_health_data.csv` | CSV Data | Empirical plant health dataset supplying observed probability distributions for Soil Nitrogen, Phosphorus, Potassium levels, and incident Solar Light Intensity. |
+| **`sensor_model`** | `dataset/plant_health_data.csv` | CSV Data | Empirical plant dataset supplying the observed distribution of incident solar light intensity used during feature synthesis. |
 | **`sensor_model`** | `dataset/irrigation_prediction.csv` | CSV Data | Environmental telemetry dataset providing ambient Temperature, Relative Humidity, Soil Moisture, and Soil pH readings. |
 | **`sensor_model`** | `dataset/training_dataset_with_yield.csv` | CSV Data | Primary training dataset containing rounded sensor values, synthesized continuous `Yield_Rate`, injected label noise, and target disease classes. |
 | **`sensor_model`** | `dataset/selected_thresholds.json` | JSON Config | Serialized JSON file storing the optimal threshold boundaries selected during cross-validation tuning. |
@@ -106,8 +106,8 @@ Multidisciplinary_Project/
 | **`satellite_weather_model`** | `satellite_weather_model.pth` | Model Binary | Saved PyTorch checkpoint with trained weights, epoch, validation accuracy and the 4 weather class names. |
 | **`farm_advisory`** | `config.py` | Python Script | Central configuration - model artifact paths, farm latitude/longitude, agronomic thresholds, weather cache TTL and delivery settings (email/Telegram disabled by default). |
 | **`farm_advisory`** | `weather_feed.py` | Python Script | Live weather feed module. Polls the Open-Meteo API (no key required) for current conditions + 3-day forecast, caches snapshots on disk, and degrades to cached/offline fallback on network failure. |
-| **`farm_advisory`** | `iot_ingestion.py` | Python Script | Live IoT sensor ingestion. `SensorIngestion` validates, clamps and appends 8-feature telemetry to `dataset/sensor_log.csv`; `SimulatedSensorNode` emits realistic streaming readings with a diurnal cycle, drift and configurable stress profiles. |
-| **`farm_advisory`** | `device_ingest.py` | Python Script | ESP32 field-node ingestion. Maps the firmware payload (`soil_moisture`, `air_temperature`, `humidity`, `light_intensity`, `mq135_raw`, `bme_temperature`, `pressure`) onto the 8-feature model schema, estimates `PH`/NPK when those probes are absent, tags every value as measured or estimated, appends to `dataset/device_readings.csv`, keeps `dataset/devices.json`, and probes a node by IP address. |
+| **`farm_advisory`** | `iot_ingestion.py` | Python Script | Live IoT sensor ingestion. `SensorIngestion` validates, clamps and appends a 5-feature telemetry row to `dataset/sensor_log.csv`; `SimulatedSensorNode` emits realistic streaming readings with a diurnal cycle, drift and configurable stress profiles. |
+| **`farm_advisory`** | `device_ingest.py` | Python Script | ESP32 field-node ingestion. Maps the firmware payload (`soil_moisture`, `air_temperature`, `humidity`, `light_intensity`, `mq135_raw`, `bme_temperature`, `pressure`) onto the 5-feature model schema, estimates `PH` when no probe is fitted, tags every value as measured or estimated, appends to `dataset/device_readings.csv`, keeps `dataset/devices.json`, and probes a node by IP address. |
 | **`farm_advisory`** | `recommendation_engine.py` | Python Script | Recommendation engine. Fuses the sensor Random Forest, yield regressor, leaf disease CNN, satellite weather CNN and live weather into prioritized, evidence-backed agronomic actions (irrigation, fertilization, pH amendment, disease control, spraying windows). |
 | **`farm_advisory`** | `delivery.py` | Python Script | Automated recommendation delivery. Renders markdown + JSON reports under `outputs/`, prints console summaries, and optionally pushes via SMTP email or a Telegram bot when configured. |
 | **`farm_advisory`** | `app.py` | Python Script | Unified entry point. `python app.py` launches the Flask web UI (browser opens automatically); `python app.py --cli` (or passing any pipeline option such as `--steps`, `--leaf`, `--offline`) runs the end-to-end live CLI pipeline - ingest telemetry, fetch weather, run the engine and deliver reports. |
@@ -149,9 +149,6 @@ flowchart TD
 | **`Humidity`** | `irrigation_prediction.csv` | $30.0\% - 95.0\%$ | Relative atmospheric humidity (rounded to 2 decimal places). Primary driver for foliar bacterial and fungal pathogens. |
 | **`Moisture`** | `irrigation_prediction.csv` | $10.0\% - 80.0\%$ | Volumetric soil water content (rounded to 2 decimal places). Regulates root rot risk and nutrient uptake. |
 | **`PH`** | `irrigation_prediction.csv` | $4.5 - 8.5\text{ pH}$ | Soil hydrogen ion concentration (rounded to 2 decimal places). Determines soil nutrient availability. |
-| **`Nitrogen`** | `plant_health_data.csv` | $10.0 - 100.0\text{ mg/kg}$ | Essential soil Nitrogen concentration (rounded to 2 decimal places). Promotes vegetative growth. |
-| **`Phosphorus`** | `plant_health_data.csv` | $10.0 - 80.0\text{ mg/kg}$ | Soil Phosphorus concentration (rounded to 2 decimal places). Crucial for root development and energy transfer. |
-| **`Potassium`** | `plant_health_data.csv` | $10.0 - 80.0\text{ mg/kg}$ | Soil Potassium concentration (rounded to 2 decimal places). Enhances disease resistance and stomatal regulation. |
 | **`Light_Intensity`** | `plant_health_data.csv` | $200.0 - 1000.0\text{ Lux}$ | Incident solar radiation (rounded to 1 decimal place). Regulates photosynthetic rate and pathogen inhibition. |
 | **`Yield_Rate`** | Multi-Factor Formula | $10.0 - 100.0\text{ Score}$ | Continuous crop productivity index incorporating soil nutrient balance, moisture, and climate adequacy. |
 | **`Target_Disease`** | Rule Engine | 6 Categorical Classes | Health status label: `Healthy`, `Early_Blight`, `Root_Rot`, `Powdery_Mildew`, `Rust`, `Bacterial_Leaf_Spot`. |
@@ -161,11 +158,11 @@ flowchart TD
 ### 3.2 Mathematical Formulation of Agronomic Scores & Synthetic Noise
 
 #### A. Continuous Yield Rate Synthesis
-The `Yield_Rate` calculation normalizes individual features against empirical bounds before computing a weighted sum with additive Gaussian noise:
+The `Yield_Rate` calculation normalizes individual features against empirical bounds before computing a weighted sum with additive Gaussian noise. With the nutrient inputs removed, the surviving weights are rescaled to still sum to 1.0:
 
 $$\text{Norm}(X, a, b) = \text{clip}\left(\frac{X - a}{b - a}, 0.0, 1.0\right)$$
 
-$$\text{Score} = 0.20 \cdot \text{Norm}(N, 10, 100) + 0.15 \cdot \text{Norm}(P, 10, 80) + 0.15 \cdot \text{Norm}(K, 10, 80) + 0.20 \cdot \text{Norm}(\text{Moisture}, 20, 70) + 0.15 \cdot \text{Norm}(\text{pH}, 5, 8) + 0.10 \cdot \text{Norm}(\text{Light}, 200, 1000) + 0.05 \cdot \text{Norm}(\text{Humidity}, 30, 90)$$
+$$\text{Score} = 0.40 \cdot \text{Norm}(\text{Moisture}, 20, 70) + 0.30 \cdot \text{Norm}(\text{pH}, 5, 8) + 0.20 \cdot \text{Norm}(\text{Light}, 200, 1000) + 0.10 \cdot \text{Norm}(\text{Humidity}, 30, 90)$$
 
 $$\text{Yield\_Rate} = \text{clip}\left(20.0 + 60.0 \cdot \text{Score} + \mathcal{N}(\mu=0, \sigma=4.0), 10.0, 100.0\right)$$
 
@@ -173,7 +170,7 @@ $$\text{Yield\_Rate} = \text{clip}\left(20.0 + 60.0 \cdot \text{Score} + \mathca
 Disease classification targets are assigned using multi-variable environmental rule conditions:
 - **Root Rot**: $\text{Moisture} > T_{\text{Moisture}} \land \text{pH} < T_{\text{pH}}$
 - **Powdery Mildew**: $T_{\text{temp,low}} \le \text{Temperature} \le T_{\text{temp,high}} \land \text{Humidity} > T_{\text{Humidity}} \land \text{Light\_Intensity} < T_{\text{Light}}$
-- **Early Blight**: $\text{Temperature} \ge T_{\text{Temperature}} \land \text{Humidity} > T_{\text{Humidity}} \land \text{Nitrogen} < T_{\text{Nitrogen}}$
+- **Early Blight**: $\text{Temperature} \ge T_{\text{Temperature}} \land \text{Humidity} > T_{\text{Humidity}} \land \text{PH} < T_{\text{PH}}$
 - **Rust**: $\text{Temperature} < T_{\text{Temperature}} \land \text{Humidity} > T_{\text{Humidity}} \land \text{Moisture} > T_{\text{Moisture}}$
 - **Bacterial Leaf Spot**: $\text{Temperature} \ge T_{\text{Temperature}} \land \text{Humidity} > T_{\text{Humidity}} \land \text{pH} > T_{\text{pH}}$
 - **Healthy**: Assigned when no environmental stress threshold is breached.
@@ -305,9 +302,9 @@ flowchart LR
 
 Key design points:
 - **Unified entry point** (`app.py`) - `python app.py` launches the Flask web UI (see section 6) and opens the browser; `python app.py --cli` — or passing any pipeline option such as `--steps`, `--leaf`, `--offline` — runs the live CLI advisory loop instead.
-- **Live IoT ingestion** (`iot_ingestion.py`) validates and persists an 8-feature telemetry row per reading (`dataset/sensor_log.csv`) and includes a realistic `SimulatedSensorNode` (diurnal cycle, drift, stress profiles). The web dashboard does not use the simulated node; it stays available to the CLI pipeline and the tests.
+- **Live IoT ingestion** (`iot_ingestion.py`) validates and persists a 5-feature telemetry row per reading (`dataset/sensor_log.csv`) and includes a realistic `SimulatedSensorNode` (diurnal cycle, drift, stress profiles). The web dashboard does not use the simulated node; it stays available to the CLI pipeline and the tests.
 - **Live weather feed** (`weather_feed.py`) uses the free Open-Meteo API and a 30-minute on-disk cache, with a graceful fallback to cached/offline values so advisories never fail on network drops.
-- **Recommendation engine** (`recommendation_engine.py`) fuses model predictions (disease probability, yield forecast, leaf diagnosis, sky condition) with agronomic thresholds (soil moisture, pH, NPK, humidity, temperature, forecast rain/heat/wind) into **prioritized actions** (High / Medium / Low) with a plain-language rationale.
+- **Recommendation engine** (`recommendation_engine.py`) fuses model predictions (disease probability, yield forecast, leaf diagnosis, sky condition) with agronomic thresholds (soil moisture, pH, humidity, temperature, forecast rain/heat/wind) into **prioritized actions** (High / Medium / Low) with a plain-language rationale.
 - **Automated delivery** (`delivery.py`) writes timestamped markdown + JSON reports to `outputs/`, prints a console summary, and can push the same advisories via SMTP email or a Telegram bot when credentials are configured in `config.py`.
 
 ---
@@ -323,7 +320,7 @@ A deliberately small Flask dashboard: four pages, one job each, behind a fixed s
 | `/vision/sky` | Sky Vision | Weather-state classification (weather CNN), same three parts. |
 | `/vision` | Vision | Redirects to `/vision/leaf`. |
 | `/advisory` | Advisory | Slider-driven full pipeline -> ranked actions, the disease pie for the scenario, the feature profile and downloadable markdown/JSON reports. |
-| `POST /api/sensor-data` | Field-node API | Ingests the ESP32 JSON payload, maps it to the 8-feature schema, stores it and returns the crop-state and yield assessment. |
+| `POST /api/sensor-data` | Field-node API | Ingests the ESP32 JSON payload, maps it to the 5-feature schema, stores it and returns the crop-state and yield assessment. |
 | `GET /api/devices` | Field-node API | Known nodes with IP address, last reading, measured-feature count and online state. |
 | `GET /api/latest` | Field-node API | Latest reading with mapped features, context signals and measured/estimated provenance; `source: none` until a node reports. |
 

@@ -25,8 +25,7 @@ SATELLITE_MODEL_PATH = os.path.join(
 )
 
 SENSOR_FEATURES = [
-    'Temperature', 'Humidity', 'Moisture', 'Nitrogen',
-    'Phosphorus', 'Potassium', 'PH', 'Light_Intensity',
+    'Temperature', 'Humidity', 'Moisture', 'PH', 'Light_Intensity',
 ]
 
 # ---------------------------------------------------------------------------
@@ -38,13 +37,12 @@ CROP_NAME = 'Wheat'
 
 # ---------------------------------------------------------------------------
 # Agronomic advisory thresholds (kept in sync with sensor_model thresholds)
+# Only the five measured features appear here; nitrogen, phosphorus and
+# potassium were dropped because no probe reports them.
 # ---------------------------------------------------------------------------
 SOIL_ADVISORY_THRESHOLDS = {
     'Moisture': {'low': 30.0, 'high': 70.0},
     'PH': {'low': 6.0, 'high': 7.5},
-    'Nitrogen': {'low': 30.0},
-    'Phosphorus': {'low': 20.0},
-    'Potassium': {'low': 25.0},
     'Humidity': {'high': 85.0},
     'Temperature': {'high': 32.0},
 }
