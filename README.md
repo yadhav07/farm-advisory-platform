@@ -106,33 +106,35 @@ EfficientNet-B0 and the weather CNN into memory.
 
 ### 3. Connect an ESP32 field node
 
-The firmware in `hardware/esp32_farm_node/` posts readings to this server. Use
-the network address the server printed on startup, not `127.0.0.1`:
+The full contract is in **[`docs/esp32_api.md`](docs/esp32_api.md)** - endpoint,
+JSON format, response shape, accepted ranges and firmware notes. In short:
 
 ```json
-POST http://<your-pc-ip>:5001/api/sensor-data
+POST https://farm-advisory-platform.onrender.com/api/sensor-data
+Content-Type: application/json
+
 {
   "device_id": "FARM_01",
-  "soil_moisture": 44,
-  "air_temperature": 27.3,
-  "humidity": 64.8,
-  "light_intensity": 585.2,
-  "mq135_raw": 1240,
-  "bme_temperature": 26.1,
-  "pressure": 1008.4
+  "soil_moisture": 65,
+  "air_temperature": 29.5,
+  "humidity": 72,
+  "light_intensity": 540,
+  "bme_temperature": 29.2,
+  "pressure": 1008,
+  "mq135_raw": 820
 }
 ```
 
-As soon as the node posts, the overview fills in: the sidebar and the top bar
-both show the node as live and the page renders its telemetry through the
-Random Forest heads. Until then the overview shows an empty state naming the
-endpoint, because the dashboard never invents data - and it checks for a node on
-its own, so there is nothing to reload.
+No API key. HTTPS. `soil_moisture`, `air_temperature` and `humidity` are
+required; everything else is optional. The reply carries the predicted crop
+state and yield score, so the node gets an assessment back for free.
 
-To see it working without hardware, post a reading by hand:
+The firmware in `hardware/esp32_farm_node/` posts readings to this server. Set
+`SERVER_URL` at the top of the sketch. To see it working without hardware, post
+a reading by hand:
 
 ```bash
-curl -X POST http://127.0.0.1:5001/api/sensor-data \
+curl -X POST https://farm-advisory-platform.onrender.com/api/sensor-data \
   -H 'Content-Type: application/json' \
   -d '{"device_id":"FARM_01","soil_moisture":44,"air_temperature":27.3,
        "humidity":64.8,"light_intensity":585.2}'
@@ -143,6 +145,7 @@ curl -X POST http://127.0.0.1:5001/api/sensor-data \
 | `POST /api/sensor-data` | ingest a firmware payload, returns crop state and yield forecast |
 | `GET /api/devices` | known nodes with IP, last reading and online state |
 | `GET /api/latest` | latest reading mapped to the 5-feature model schema (`source: none` until a node reports) |
+| `GET /healthz` | liveness probe, loads no model |
 
 Four features map straight from the hardware (temperature, humidity, moisture,
 light). `ph`, `nitrogen`, `phosphorus` and `potassium` are **estimated** from soil
