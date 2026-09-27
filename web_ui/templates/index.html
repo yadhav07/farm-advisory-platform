@@ -151,6 +151,61 @@
     <div class="panel-body">{{ sparkgrid(telemetry) }}</div>
   </article>
 
+  {# Everything the node reported: the five model features with their
+     measured/estimated tag, plus the context signals the firmware sends
+     that the models do not consume. This is the one card that needs a
+     guard, because it cannot render at all without a reading. #}
+  {% if live %}
+  <article class="panel-card">
+    <div class="panel-header">
+      <div><span class="panel-kicker">FIELD NODE</span><h2>Everything the node reported</h2></div>
+      <span class="panel-period">{{ live.measured }} of {{ fields|length }} measured</span>
+    </div>
+    <div class="panel-body">
+      <div class="reading-layout">
+        <div class="reading-list">
+          {% for f in fields %}
+          {% set is_measured = live.provenance.get(f.name) == 'measured' %}
+          <div class="reading-row">
+            <span class="reading-label">{{ f.label }}</span>
+            <strong class="reading-value">{{ fmt(live.sensor[f.name], 1 if f.step < 1 else 0) }}<small>{{ f.unit }}</small></strong>
+            <span class="badge {{ 'ok' if is_measured else 'estimated' }}">{{ 'measured' if is_measured else 'estimated' }}</span>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="node-meta">
+          <div class="node-meta-head">
+            <span class="status-icon {{ 'live' if live.online else 'idle' }}">
+              <i class="fa-solid {{ 'fa-circle-check' if live.online else 'fa-clock' }}"></i>
+            </span>
+            <div>
+              <strong>{{ live.device_id }}</strong>
+              <span>{{ 'reporting now' if live.online else 'idle' }} &middot; {{ live.timestamp[11:19] }} UTC</span>
+            </div>
+          </div>
+          <div class="node-meta-row"><span>IP address</span><strong>{{ live.source_ip or 'not reported' }}</strong></div>
+          {% if live.context.mq135_index is not none %}
+          <div class="node-meta-row"><span>Air quality (MQ-135)</span><strong>{{ fmt(live.context.mq135_index) }} / 100</strong></div>
+          {% endif %}
+          {% if live.context.bme_temperature is not none %}
+          <div class="node-meta-row"><span>Board temperature (BME280)</span><strong>{{ fmt(live.context.bme_temperature) }}&deg;C</strong></div>
+          {% endif %}
+          {% if live.context.pressure %}
+          <div class="node-meta-row"><span>Pressure (BME280)</span><strong>{{ fmt(live.context.pressure) }} hPa</strong></div>
+          {% endif %}
+          {% if live.provenance.get('PH') != 'measured' %}
+          <p class="panel-hint node-hint">
+            Soil pH is estimated from moisture because the node has no pH probe.
+            Add a <code>ph</code> value to the payload to report it as measured.
+          </p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </article>
+  {% endif %}
+
 </section>
 {% endblock %}
 

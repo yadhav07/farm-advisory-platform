@@ -315,7 +315,8 @@ def index():
             error = format_error(str(exc))
 
     return render_template('index.html', result=result, risk=risk,
-                           telemetry=telemetry, error=error)
+                           telemetry=telemetry, error=error,
+                           fields=SENSOR_FIELD_GUIDE)
 
 
 # ---------------------------------------------------------------------------
@@ -372,14 +373,24 @@ def advisory():
     longitude = None
 
     if request.method == 'GET':
-        # Start from the live node when one exists, otherwise the guide defaults.
-        live = current_reading(request.args.get('device_id'))
+        # `?source=defaults` starts from the guide defaults and ignores the
+        # node, which is what the Reset button asks for. A plain GET, and the
+        # "Load live reading" button behind ?source=node, both pull the node's
+        # latest row - that is the button's whole job, since the page is
+        # server-rendered and a GET re-reads the registry.
+        #
+        # The parameter is called `source` rather than `from` because `from` is
+        # a Python keyword: url_for('advisory', from_='defaults') emits
+        # "?from_=defaults", which the route would never see.
+        from_node = request.args.get('source') != 'defaults'
+        live = current_reading(request.args.get('device_id')) if from_node else None
         if live:
             values = live['sensor']
             source = (f"the last reading from {live['device_id']} "
                       f"at {live['timestamp'][11:19]} UTC")
         else:
-            source = 'the guide defaults (no field node is reporting)'
+            source = ('the guide defaults (no field node is reporting)'
+                      if from_node else 'the guide defaults')
     else:
         values, error = parse_sensor_form(request.form)
         use_weather = (request.form.get('use_weather') == 'on')

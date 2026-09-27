@@ -27,7 +27,18 @@
     <article class="panel-card">
       <div class="panel-header">
         <div><span class="panel-kicker">INPUTS</span><h2>Telemetry, photo and weather</h2></div>
-        <a class="secondary-button" href="{{ url_for('advisory') }}"><i class="fa-solid fa-rotate-left"></i> Reset</a>
+        <div class="panel-header-actions">
+          {% if live %}
+          <a class="secondary-button live-button" href="{{ url_for('advisory', source='node') }}"
+             title="Pull the node's latest reading into the sliders">
+            <i class="fa-solid fa-cloud-arrow-down"></i> Load {{ live.device_id }} reading
+          </a>
+          {% endif %}
+          <a class="secondary-button" href="{{ url_for('advisory', source='defaults') }}"
+             title="Ignore the node and start from the guide defaults">
+            <i class="fa-solid fa-rotate-left"></i> Reset
+          </a>
+        </div>
       </div>
       <div class="panel-body">
         <p class="panel-hint inline">

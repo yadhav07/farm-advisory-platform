@@ -82,8 +82,9 @@
 {% set panels = [
   {'title': 'Temperature',   'series': [('Temperature', 'C', '#d97706')]},
   {'title': 'Humidity',      'series': [('Humidity', '%', '#2878d0')]},
-  {'title': 'Light',         'series': [('Light_Intensity', 'lux', '#f2b705')]},
-  {'title': 'Soil moisture', 'series': [('Moisture', '%', '#18794e')]}
+  {'title': 'Soil moisture', 'series': [('Moisture', '%', '#18794e')]},
+  {'title': 'Soil pH',       'series': [('PH', '', '#6b4fc4')]},
+  {'title': 'Light',         'series': [('Light_Intensity', 'lux', '#f2b705')]}
 ] %}
 {% if not records %}
 <div class="empty">No telemetry logged yet. Readings appear here as the node reports.</div>
