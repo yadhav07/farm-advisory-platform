@@ -97,39 +97,119 @@ def sensor_predict(values):
 
 
 # ---------------------------------------------------------------------------
-# Leaf disease model (EfficientNet-B0 CNN)
+# Image models: a bounded cache, because memory is the binding constraint here.
+#
+# Measured resident memory on this project:
+#
+#     python + flask            18 MB
+#     + Random Forest bundle   203 MB   (the overview needs this)
+#     + torch imported         659 MB   <- the single biggest item
+#     + EfficientNet-B0        836 MB
+#     + weather CNN            899 MB
+#
+# Importing torch alone costs ~460 MB, more than every model put together, so
+# nothing here can fit a 512 MB instance. What the cache does buy is headroom
+# on a host that is big enough: by default only ONE image model stays
+# resident, which keeps roughly 180 MB free. Set IMAGE_MODEL_CACHE=2 to keep
+# both and pay a reload when a user alternates between the two pages.
 # ---------------------------------------------------------------------------
-_leaf_meta = None  # (model, class_names, transform)
+_IMAGE_MODELS = {}  # kind -> (model, class_names, transform), least recent first
+_IMAGE_CACHE_SIZE = max(1, int(os.environ.get('IMAGE_MODEL_CACHE', '1') or 1))
+
+
+def _configure_torch():
+    """Import torch and shrink its per-thread allocator arenas.
+
+    torch reserves a work arena per thread, so the default thread count costs
+    real memory on a small host. Inference here is a single 224x224 image, so
+    one thread is not slower in any way that matters.
+    """
+    import torch
+    torch.set_num_threads(1)
+    return torch
+
+
+def _load_leaf_model():
+    from torchvision import models, transforms as T
+
+    if not os.path.exists(LEAF_MODEL_PATH):
+        raise FileNotFoundError(
+            f'Leaf model not found: {LEAF_MODEL_PATH}. '
+            'Run leaf_disease_model/train.py first.'
+        )
+    torch = _configure_torch()
+    checkpoint = torch.load(LEAF_MODEL_PATH, map_location=DEVICE, weights_only=False)
+    class_names = checkpoint['class_names']
+
+    _ensure_on_path(os.path.dirname(LEAF_MODEL_PATH))
+    from train import create_model
+    model = create_model(len(class_names), model_name='efficientnet_b0')
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.to(DEVICE)
+    model.eval()
+
+    transform = T.Compose([
+        T.Resize((224, 224)),
+        T.ToTensor(),
+        T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+    return (model, class_names, transform)
+
+
+def _load_satellite_model():
+    if not os.path.exists(SATELLITE_MODEL_PATH):
+        raise FileNotFoundError(
+            f'Satellite model not found: {SATELLITE_MODEL_PATH}. '
+            'Run satellite_weather_model/main.py first.'
+        )
+    torch = _configure_torch()
+    checkpoint = torch.load(SATELLITE_MODEL_PATH, map_location=DEVICE, weights_only=True)
+    class_names = checkpoint['class_names']
+
+    _ensure_on_path(os.path.join(PROJECT_ROOT, 'satellite_weather_model'))
+    from main import Net, EVAL_TRANSFORM
+    model = Net(num_classes=len(class_names))
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.to(DEVICE)
+    model.eval()
+    return (model, class_names, EVAL_TRANSFORM)
+
+
+_LOADERS = {'leaf': _load_leaf_model, 'sky': _load_satellite_model}
+
+
+def _get_image_model(kind):
+    """Return (model, class_names, transform) for 'leaf' or 'sky'.
+
+    Evicts the least recently used model once the cache is full, so the two
+    CNNs are never resident at the same time unless IMAGE_MODEL_CACHE says so.
+    """
+    if kind in _IMAGE_MODELS:
+        entry = _IMAGE_MODELS.pop(kind)   # reinsert as most recently used
+        _IMAGE_MODELS[kind] = entry
+        return entry
+
+    # Drop the oldest BEFORE loading, otherwise the peak holds both.
+    while len(_IMAGE_MODELS) >= _IMAGE_CACHE_SIZE:
+        _IMAGE_MODELS.pop(next(iter(_IMAGE_MODELS)))
+        import gc
+        gc.collect()
+
+    entry = _LOADERS[kind]()
+    _IMAGE_MODELS[kind] = entry
+    return entry
 
 
 def _get_leaf_model():
-    global _leaf_meta
-    if _leaf_meta is None:
-        import torch
-        from torchvision import models, transforms as T
+    return _get_image_model('leaf')
 
-        if not os.path.exists(LEAF_MODEL_PATH):
-            raise FileNotFoundError(
-                f'Leaf model not found: {LEAF_MODEL_PATH}. '
-                'Run leaf_disease_model/train.py first.'
-            )
-        checkpoint = torch.load(LEAF_MODEL_PATH, map_location=DEVICE, weights_only=False)
-        class_names = checkpoint['class_names']
 
-        _ensure_on_path(os.path.dirname(LEAF_MODEL_PATH))
-        from train import create_model
-        model = create_model(len(class_names), model_name='efficientnet_b0')
-        model.load_state_dict(checkpoint['model_state_dict'])
-        model.to(DEVICE)
-        model.eval()
+def _get_satellite_model():
+    return _get_image_model('sky')
 
-        transform = T.Compose([
-            T.Resize((224, 224)),
-            T.ToTensor(),
-            T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ])
-        _leaf_meta = (model, class_names, transform)
-    return _leaf_meta
+
+def _get_leaf_model():
+    return _get_image_model('leaf')
 
 
 def leaf_diagnose(image_path):
@@ -157,32 +237,6 @@ def leaf_diagnose(image_path):
 # ---------------------------------------------------------------------------
 # Satellite / weather-state model (image CNN)
 # ---------------------------------------------------------------------------
-_satellite_meta = None  # (model, class_names, transform)
-
-
-def _get_satellite_model():
-    global _satellite_meta
-    if _satellite_meta is None:
-        import torch
-
-        if not os.path.exists(SATELLITE_MODEL_PATH):
-            raise FileNotFoundError(
-                f'Satellite model not found: {SATELLITE_MODEL_PATH}. '
-                'Run satellite_weather_model/main.py first.'
-            )
-        checkpoint = torch.load(SATELLITE_MODEL_PATH, map_location=DEVICE, weights_only=True)
-        class_names = checkpoint['class_names']
-
-        _ensure_on_path(os.path.join(PROJECT_ROOT, 'satellite_weather_model'))
-        from main import Net, EVAL_TRANSFORM
-        model = Net(num_classes=len(class_names))
-        model.load_state_dict(checkpoint['model_state_dict'])
-        model.to(DEVICE)
-        model.eval()
-        _satellite_meta = (model, class_names, EVAL_TRANSFORM)
-    return _satellite_meta
-
-
 def satellite_diagnose(image_path):
     """Classify the weather state of an image -> {prediction, probability, topk}."""
     import numpy as np

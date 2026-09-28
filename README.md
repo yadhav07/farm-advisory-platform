@@ -70,7 +70,44 @@ Both vision pages share one template; `/vision` redirects to `/vision/leaf`.
 `GET /healthz` is a liveness probe that loads no model, so it answers while the
 artifacts are still cold.
 
-### 2b. Run it as a production server
+### 2b. Host sizing
+
+This app is memory-hungry and a small instance will crash it. Measured
+resident memory, one step at a time:
+
+| Stage | Resident |
+| :--- | ---: |
+| python + flask | 18 MB |
+| + Random Forest bundle (the overview needs it) | 203 MB |
+| + `import torch` | 659 MB |
+| + EfficientNet-B0 | 836 MB |
+| + weather CNN | 899 MB |
+
+Importing `torch` alone costs about 460 MB, more than every model in the
+project put together. No amount of caching changes that, so the service
+needs **at least 2 GB**.
+
+On Render that means the **standard** instance. Note that **starter is
+also 512 MB**, so upgrading one tier will not help - it has more CPU but
+the same memory as free.
+
+Two mitigations are in the code, and they buy headroom on a host that is
+big enough rather than making a small host work:
+
+- Only **one image model is resident at a time** by default. The LRU evicts
+  the other before loading a new one, which keeps roughly 180 MB free. Set
+  `IMAGE_MODEL_CACHE=2` to keep both and pay a reload when a user
+  alternates between the two vision pages.
+- `torch` is pinned to **one thread**. It reserves a work arena per
+  thread, so the default thread count is a real memory cost, and inference
+  is a single 224x224 image where extra threads buy nothing.
+
+If you must stay on a 512 MB instance, the overview and advisory work
+(203 MB, no torch), but any request to a vision page will pull torch in
+and take the whole process down with it - the OOM is process-wide, so the
+overview goes down too.
+
+### 2c. Run it as a production server
 
 `python app.py` uses the Flask development server, which is fine locally but is
 not meant for anything else. For a real deployment use the WSGI entry point:
