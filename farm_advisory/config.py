@@ -28,6 +28,17 @@ SENSOR_FEATURES = [
     'Temperature', 'Humidity', 'Moisture', 'PH', 'Light_Intensity',
 ]
 
+# Where the node reading log and registry are written: device_readings.csv and
+# devices.json.
+#
+# This defaults to a folder inside the checkout, which is correct on a laptop
+# and WRONG on a PaaS: the container filesystem is discarded on every restart,
+# redeploy or out-of-memory kill, so the sensor history does not survive. Point
+# FARM_DATA_DIR at a mounted persistent disk to keep it.
+DATASET_DIR = os.environ.get('FARM_DATA_DIR') or os.path.join(
+    BASE_DIR, 'dataset'
+)
+
 # ---------------------------------------------------------------------------
 # Farm / location configuration (Open-Meteo takes decimal lat/lon)
 # ---------------------------------------------------------------------------
@@ -60,7 +71,9 @@ SENSOR_LOG_PATH = os.path.join(BASE_DIR, 'dataset', 'sensor_log.csv')
 # ---------------------------------------------------------------------------
 # Automated delivery (all disabled by default - set to enable)
 # ---------------------------------------------------------------------------
-REPORT_DIR = os.path.join(BASE_DIR, 'outputs')
+REPORT_DIR = os.environ.get('FARM_REPORT_DIR') or os.path.join(
+    BASE_DIR, 'outputs'
+)
 DELIVERY = {
     'console': True,     # always print summary to console
     'file': True,        # always write markdown + json reports

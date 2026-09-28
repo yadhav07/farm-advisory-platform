@@ -12,6 +12,7 @@ Plus the field-node API consumed by the ESP32 firmware:
 * ``POST /api/sensor-data``  ingest a firmware reading
 * ``GET  /api/devices``      list known nodes
 * ``GET  /api/latest``       latest reading mapped to the model schema
+* ``GET  /api/history``      the recorded readings, as JSON or CSV
 
 There is no simulated node. The dashboard reports real hardware only and shows
 an empty state until a node posts a reading.
@@ -273,6 +274,57 @@ def api_latest():
         'sensor': live['sensor'],
         'context': live['context'],
         'provenance': live['provenance'],
+    })
+
+
+@app.route('/api/history')
+def api_history():
+    """The recorded reading history.
+
+    This is the data behind the overview trend charts. Until this existed the
+    history was only reachable by opening the CSV inside the container, which
+    a client cannot do.
+
+    Query parameters:
+
+    ``device_id``  restrict to one node; defaults to every known node
+    ``limit``      most recent N rows, oldest first (default 200, max 5000)
+    ``since``      ISO timestamp or ``YYYY-MM-DD`` lower bound
+    ``until``      ISO timestamp or ``YYYY-MM-DD`` upper bound
+    ``format``     ``json`` (default) or ``csv`` for a file download
+    """
+    registry = model_service.get_device_registry()
+    limit = min(5000, max(1, request.args.get('limit', 200, type=int)))
+    device_id = request.args.get('device_id') or None
+
+    if request.args.get('format') == 'csv':
+        text = registry.history_csv(device_id, limit=0)
+        if not text:
+            return jsonify({'ok': True, 'rows': 0,
+                            'detail': 'no readings recorded yet'}), 404
+        label = device_id or 'all'
+        return app.response_class(
+            text, mimetype='text/csv',
+            headers={'Content-Disposition':
+                     f'attachment; filename="readings_{label}.csv"'})
+
+    rows = registry.history_full(device_id, limit=limit,
+                                 since=request.args.get('since') or None,
+                                 until=request.args.get('until') or None)
+    known = [d['device_id'] for d in registry.devices()]
+    return jsonify({
+        'ok': True,
+        'device_id': device_id,
+        'known_devices': known,
+        'count': len(rows),
+        'limit': limit,
+        'columns': ['timestamp', 'device_id', 'source_ip', 'firmware_measured']
+                   + list(model_service.SENSOR_FEATURES)
+                   + ['mq135_raw', 'bme_temperature', 'pressure'],
+        'note': 'history lives in farm_advisory/dataset/device_readings.csv, '
+                'inside the container filesystem - it is lost on any restart '
+                'or redeploy unless a disk is attached',
+        'readings': rows,
     })
 
 

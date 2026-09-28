@@ -182,13 +182,40 @@ curl -X POST https://farm-advisory-platform.onrender.com/api/sensor-data \
 | `POST /api/sensor-data` | ingest a firmware payload, returns crop state and yield forecast |
 | `GET /api/devices` | known nodes with IP, last reading and online state |
 | `GET /api/latest` | latest reading mapped to the 5-feature model schema (`source: none` until a node reports) |
+| `GET /api/history` | the recorded readings, as JSON or `?format=csv` for a file download |
 | `GET /healthz` | liveness probe, loads no model |
 
-Four features map straight from the hardware (temperature, humidity, moisture,
-light). `ph`, `nitrogen`, `phosphorus` and `potassium` are **estimated** from soil
-moisture and the MQ-135 reading until those probes are fitted; send them in the
-payload and they are used verbatim instead. The UI labels each value as
+Three features map straight from the hardware (temperature, humidity, moisture)
+and `light_intensity` is used when the node has an LDR. `ph` is **estimated**
+from soil moisture and the MQ-135 reading until a pH probe is fitted; send `ph`
+in the payload and it is used verbatim instead. The UI labels each value as
 measured or estimated.
+
+Nitrogen, phosphorus and potassium were **removed** from the schema. No probe
+reports them, so the dashboard would have been showing three invented numbers on
+every reading. A soil lab test is the right source for those.
+
+### Where the reading history lives
+
+Every accepted reading is appended to
+`farm_advisory/dataset/device_readings.csv` (12 columns: `timestamp`,
+`device_id`, `source_ip`, `firmware_measured`, the 5 features, then
+`mq135_raw`, `bme_temperature`, `pressure`). `devices.json` alongside it holds
+the newest reading per node.
+
+Read it back over HTTP with `GET /api/history`:
+
+```bash
+curl 'https://farm-advisory-platform.onrender.com/api/history?device_id=FARM_01&limit=50'
+curl 'https://farm-advisory-platform.onrender.com/api/history?format=csv' -o readings.csv
+curl 'https://farm-advisory-platform.onrender.com/api/history?since=2026-09-28'
+```
+
+**This file is not durable on the current hosting plan.** It is written inside
+the container filesystem, so it is discarded on every restart, redeploy or
+out-of-memory kill - and the free tier does all three routinely. Readings
+survive only until the next restart. To keep them, move the path onto a
+persistent disk (`FARM_DATA_DIR`) and attach one; see *Host sizing* above.
 
 ### 4. Or run the live CLI pipeline
 

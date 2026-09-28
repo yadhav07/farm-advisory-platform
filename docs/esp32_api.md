@@ -137,9 +137,28 @@ Useful for debugging a node. All are `GET` and need no key.
 | :--- | :--- |
 | `/api/latest` | The latest reading, mapped to the model schema. `{"source": "none"}` until a node reports. |
 | `/api/devices` | Every node that has reported, with IP, last-seen time and online state |
+| `/api/history` | Every recorded reading, oldest first. `?format=csv` downloads the raw log. |
 | `/healthz` | Liveness probe. Answers fast and loads no model. |
 
 `/api/latest` accepts `?device_id=FARM_01` to pick a specific node.
+
+`/api/history` accepts:
+
+| Parameter | Meaning |
+| :--- | :--- |
+| `device_id` | one node; omit for all nodes |
+| `limit` | most recent N rows, oldest first (default 200, max 5000) |
+| `since` | ISO timestamp or `YYYY-MM-DD` lower bound |
+| `until` | ISO timestamp or `YYYY-MM-DD` upper bound |
+| `format` | `json` (default) or `csv` |
+
+The optional context signals come back as `null` when the firmware did not send
+them, so the key is always present.
+
+**History is not durable on the free hosting tier.** Readings are appended to a
+CSV inside the container, which is discarded on every restart, redeploy or
+out-of-memory kill. Do not rely on `/api/history` as a system of record until a
+persistent disk is attached.
 
 ---
 

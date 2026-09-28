@@ -1,0 +1,88 @@
+{
+  "crop": "Wheat",
+  "node_id": "SIM-STRESS",
+  "timestamp": "2026-09-28T14:04:59",
+  "sensor": {
+    "Temperature": 23.55,
+    "Humidity": 72.33,
+    "Moisture": 48.01,
+    "PH": 6.08,
+    "Light_Intensity": 412.8,
+    "disease_prediction": "Healthy",
+    "disease_probabilities": {
+      "Bacterial_Leaf_Spot": 0.019850996598312468,
+      "Early_Blight": 0.03768950137627526,
+      "Healthy": 0.8896365028067483,
+      "Powdery_Mildew": 0.0034639078495823307,
+      "Root_Rot": 0.017237151725232946,
+      "Rust": 0.03212193964384875
+    },
+    "top_disease_risk": {
+      "disease": "Early_Blight",
+      "probability": 0.03768950137627526
+    },
+    "yield_forecast": 48.98
+  },
+  "weather": {
+    "source": "open-meteo",
+    "latitude": 28.6139,
+    "longitude": 77.209,
+    "observed_at": "2026-09-28T13:45",
+    "temperature": 27.4,
+    "humidity": 72,
+    "precipitation_mm": 0.0,
+    "wind_speed_kmh": 4.6,
+    "weather_code": 3,
+    "weather_label": "Overcast",
+    "forecast": {
+      "dates": [
+        "2026-09-28",
+        "2026-09-29",
+        "2026-09-30"
+      ],
+      "t_max": [
+        28.1,
+        30.7,
+        32.0
+      ],
+      "t_min": [
+        22.2,
+        22.1,
+        22.5
+      ],
+      "precip_probability": [
+        37,
+        22,
+        0
+      ],
+      "precip_sum": [
+        4.6,
+        0.0,
+        0.0
+      ]
+    }
+  },
+  "leaf": {
+    "image": "D:\\Multidisciplinary_Project\\leaf_disease_model\\dataset\\test\\01dfb88b-cd5a-420c-b163-51f5fe07b74d___JR_B-Spot-9091_JPG.rf.6a71c0d99eea0a2d8ee98036d4dfb92f.jpg",
+    "prediction": "pepper bell bacterial spot",
+    "probability": 0.8711850047111511,
+    "all_probabilities": {
+      "pepper bell bacterial spot": 0.8711850047111511,
+      "pepper bell healthy": 0.021868178620934486,
+      "potato early blight": 0.05936412885785103,
+      "potato healthy": 0.02163027785718441,
+      "potato late blight": 0.009343420155346394,
+      "tomato target spot": 0.01660907454788685
+    }
+  },
+  "sky": null,
+  "recommendations": [
+    {
+      "priority": "High",
+      "category": "Leaf Disease",
+      "action": "Pepper Bell Bacterial Spot detected on the leaf image - isolate affected plants, remove infected foliage and apply a registered treatment.",
+      "rationale": "Leaf image classifier reports Pepper Bell Bacterial Spot with 87.1% confidence."
+    }
+  ],
+  "summary": "Action recommended - crop state: Healthy; yield forecast: 48.98; 1 advisory action(s)."
+}

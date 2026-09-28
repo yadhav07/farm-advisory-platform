@@ -49,18 +49,17 @@ and displayed, but are not part of the model schema.
 
 import os
 import csv
+import io
 import json
 import time
 import datetime as dt
 import urllib.error
 import urllib.request
 
-from config import PROJECT_ROOT, SENSOR_FEATURES
+from config import PROJECT_ROOT, SENSOR_FEATURES, DATASET_DIR
 
-DEVICE_LOG_PATH = os.path.join(PROJECT_ROOT, 'farm_advisory', 'dataset',
-                               'device_readings.csv')
-DEVICE_REGISTRY_PATH = os.path.join(PROJECT_ROOT, 'farm_advisory', 'dataset',
-                                    'devices.json')
+DEVICE_LOG_PATH = os.path.join(DATASET_DIR, 'device_readings.csv')
+DEVICE_REGISTRY_PATH = os.path.join(DATASET_DIR, 'devices.json')
 
 # Healthy-farm pH baseline used when no probe is fitted.
 BASELINE = {'PH': 6.6}
@@ -268,23 +267,82 @@ class DeviceRegistry:
         return self.latest.get(device_id)
 
     def history(self, device_id=None, limit=40):
-        """Most recent sensor rows for a device, oldest first."""
+        """Most recent sensor rows for a device, oldest first.
+
+        Feature values only, because that is what the trend charts plot. Use
+        :meth:`history_full` when the timestamps and context signals matter.
+        """
+        return [
+            {feature: row[feature] for feature in SENSOR_FEATURES
+             if feature in row}
+            for row in self.history_full(device_id, limit=limit)
+        ]
+
+    def history_full(self, device_id=None, limit=200, since=None, until=None):
+        """Complete stored rows for a device, oldest first.
+
+        Unlike :meth:`history` this keeps everything the log recorded: the
+        timestamp, the source IP, which values the firmware actually measured
+        rather than derived, and the MQ-135/BME280 context signals.
+
+        ``since``/``until`` are ISO timestamps or ``YYYY-MM-DD`` dates, so a
+        caller can ask for one day without post-processing the whole log.
+        """
         if not os.path.exists(self.log_path):
-            return []
-        target = device_id or (self.order[0] if self.order else None)
-        if target is None:
             return []
 
         rows = []
         with open(self.log_path, 'r', encoding='utf-8', newline='') as handle:
-            for row in csv.DictReader(handle):
-                if row.get('device_id') != target:
+            for raw in csv.DictReader(handle):
+                if device_id and raw.get('device_id') != device_id:
                     continue
-                try:
-                    rows.append({f: float(row.get(f)) for f in SENSOR_FEATURES})
-                except (TypeError, ValueError):
+
+                stamp = (raw.get('timestamp') or '').strip()
+                if since and stamp and stamp < since:
                     continue
-        return rows[-limit:]
+                if until and stamp and stamp > until:
+                    continue
+
+                row = {
+                    'timestamp': stamp,
+                    'device_id': raw.get('device_id') or '',
+                    'source_ip': raw.get('source_ip') or '',
+                    'firmware_measured': int(raw.get('firmware_measured') or 0),
+                }
+                for field in SENSOR_FEATURES:
+                    try:
+                        row[field] = float(raw.get(field))
+                    except (TypeError, ValueError):
+                        continue
+                # Context signals are optional in firmware, but a consumer of
+                # the JSON should not have to cope with the key vanishing, so
+                # report an absent signal as null rather than dropping it.
+                for field in ('mq135_raw', 'bme_temperature', 'pressure'):
+                    try:
+                        row[field] = float(raw.get(field))
+                    except (TypeError, ValueError):
+                        row[field] = None
+                rows.append(row)
+
+        return rows[-limit:] if limit else rows
+
+    def history_csv(self, device_id=None, limit=0):
+        """Raw log text, optionally filtered. Used for the CSV download."""
+        if not os.path.exists(self.log_path):
+            return ''
+        if device_id or limit:
+            rows = self.history_full(device_id, limit=limit or None)
+            if not rows:
+                return ''
+            buffer = io.StringIO()
+            writer = csv.DictWriter(buffer, fieldnames=LOG_FIELDS,
+                                    extrasaction='ignore')
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(row)
+            return buffer.getvalue()
+        with open(self.log_path, 'r', encoding='utf-8', newline='') as handle:
+            return handle.read()
 
     # -------------------------------------------------------- reachability
     def probe(self, ip, timeout=2.5):
